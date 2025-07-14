@@ -17,8 +17,8 @@
 */
 
 import "./winampStyles.css";
-import "./visualRefreshWinampStyles.css";
 
+// import "./visualRefreshWinampStyles.css";
 import { classNameFactory } from "@api/Styles";
 import { Flex } from "@components/Flex";
 import { classes } from "@utils/misc";
@@ -116,18 +116,7 @@ function Controls() {
             >
                 <Repeat />
             </Button>
-            <div className={cl("volume-control")}>
-                <VolumeIcon />
-                <Slider
-                    className={cl("volume-slider")}
-                    minValue={0}
-                    maxValue={100}
-                    initialValue={volume}
-                    onValueChange={(v: number) => WinampStore.setVolume(v)}
-                    onValueRender={(v: number) => `${Math.round(v)}%`}
-                    hideBubble={false}
-                />
-            </div>
+
         </Flex>
     );
 }
@@ -236,7 +225,21 @@ function TrackInfo({ track }: { track: Track; }) {
         </div>
     );
 }
-
+function Volume({ volume }: { volume: number; }) {
+    return (
+        <div id={cl("volume-bar")}>
+            <Slider
+                className={cl("slider")}
+                minValue={0}
+                maxValue={100}
+                initialValue={volume}
+                onValueChange={(v: number) => WinampStore.setVolume(v)}
+                onValueRender={(v: number) => `${Math.round(v)}%`}
+                hideBubble={false}
+            />
+        </div>
+    );
+}
 export function Player() {
     const [track, volume, isPlaying, isSettingPosition] = useStateFromStores(
         [WinampStore],
@@ -256,6 +259,7 @@ export function Player() {
     return (
         <div id={cl("player")}>
             <TrackInfo track={track} />
+            <Volume volume={volume} />
             <Controls />
             <WinampSeekBar />
         </div>
