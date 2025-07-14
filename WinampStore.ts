@@ -118,22 +118,36 @@ export const WinampStore = proxyLazyWebpack(() => {
         }
 
         setVolume(percent: number) {
-            this.httpQRequest("setvolume", percent.toString()).then(() => {
+            // Immediately update UI for responsive feedback
+            this.volume = percent;
+            this.emitChange();
+
+            this.httpQRequest("setvolume", `level=${percent}`).then(() => {
+                // Confirm the state is still correct after the request
                 this.volume = percent;
                 this.emitChange();
-            }).catch(e =>
-                console.error("[WinampControls] Failed to set volume:", e)
-            );
+            }).catch(e => {
+                console.error("[WinampControls] Failed to set volume:", e);
+                // Note: We don't revert volume on error as it's less critical
+            });
         }
 
         setPlaying(playing: boolean) {
+            // Immediately update UI for responsive feedback
+            this.isPlaying = playing;
+            this.emitChange();
+
             const command = playing ? "play" : "pause";
             this.httpQRequest(command).then(() => {
+                // Confirm the state is still correct after the request
                 this.isPlaying = playing;
                 this.emitChange();
-            }).catch(e =>
-                console.error(`[WinampControls] Failed to ${command}:`, e)
-            );
+            }).catch(e => {
+                console.error(`[WinampControls] Failed to ${command}:`, e);
+                // Revert the state on error
+                this.isPlaying = !playing;
+                this.emitChange();
+            });
         }
 
         setRepeat(state: Repeat) {
@@ -144,7 +158,7 @@ export const WinampStore = proxyLazyWebpack(() => {
         }
 
         setShuffle(state: boolean) {
-            this.httpQRequest("shuffle", state ? "1" : "0").then(() => {
+            this.httpQRequest("shuffle", `enable=${state ? "1" : "0"}`).then(() => {
                 this.shuffle = state;
                 this.emitChange();
             }).catch(e => {
@@ -160,10 +174,7 @@ export const WinampStore = proxyLazyWebpack(() => {
 
             this.isSettingPosition = true;
 
-            // Convert milliseconds to seconds for httpQ
-            const seconds = Math.floor(ms / 1000);
-
-            return this.httpQRequest("setpos", seconds.toString()).then(() => {
+            return this.httpQRequest("jumptotime", `ms=${ms}`).then(() => {
                 this.position = ms;
                 this.isSettingPosition = false;
             }).catch((e: any) => {
@@ -176,20 +187,23 @@ export const WinampStore = proxyLazyWebpack(() => {
         public async getCurrentState(): Promise<PlayerState | null> {
             try {
                 const responses = await Promise.all([
-                    this.httpQRequest("getplaystatus"),
+                    this.httpQRequest("isplaying"),
                     this.httpQRequest("getcurrenttitle"),
                     this.httpQRequest("getvolume"),
-                    this.httpQRequest("getpos"),
-                    this.httpQRequest("getlength")
+                    this.httpQRequest("getoutputtime", "1"), // Position in milliseconds
+                    this.httpQRequest("getoutputtime", "2") // Track length in seconds
                 ]);
 
                 const [playStatus, title, volume, position, length] = responses;
 
                 // Parse the responses (httpQ returns simple text)
-                const isPlaying = playStatus.trim() === "1";
+                const playStatusValue = parseInt(playStatus.trim()) || 0;
+                // httpQ isplaying returns: 1 = playing, 0 = not playing, 3 = paused
+                // We treat paused (3) as not playing for UI purposes
+                const isPlaying = playStatusValue === 1;
                 const currentVolume = parseInt(volume.trim()) || 0;
-                const currentPosition = (parseInt(position.trim()) || 0) * 1000; // Convert to ms
-                const trackLength = (parseInt(length.trim()) || 0) * 1000; // Convert to ms
+                const currentPosition = parseInt(position.trim()) || 0; // Already in milliseconds
+                const trackLength = (parseInt(length.trim()) || 0) * 1000; // Convert seconds to ms
 
                 // Parse track info from title (format may vary)
                 const trackInfo = this.parseTrackInfo(title.trim());
@@ -283,7 +297,7 @@ export const WinampStore = proxyLazyWebpack(() => {
         // Test httpQ connection
         public async testConnection(): Promise<boolean> {
             try {
-                await this.httpQRequest("version");
+                await this.httpQRequest("getversion");
                 console.log("[WinampControls] httpQ connection successful");
                 return true;
             } catch (error) {

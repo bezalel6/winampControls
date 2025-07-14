@@ -197,3 +197,36 @@
     padding: 0.5em;
     color: var(--text-default);
 }
+
+.vc-winamp-volume-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 8px;
+}
+
+.vc-winamp-volume-slider {
+    width: 70px;
+    padding: 0 !important;
+}
+
+.vc-winamp-volume-slider [class^="bar-"] {
+    height: 4px !important;
+    background: var(--background-modifier-accent);
+    border-radius: 2px;
+}
+
+.vc-winamp-volume-slider [class^="grabber"] {
+    height: 10px !important;
+    width: 10px !important;
+    margin-top: 4px;
+    background-color: var(--interactive-normal);
+    border-color: var(--interactive-normal);
+    color: var(--interactive-normal);
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+
+.vc-winamp-volume-slider:hover [class^="grabber"] {
+    opacity: 1;
+}

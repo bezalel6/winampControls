@@ -27,7 +27,15 @@ export async function httpQRequest(_: IpcMainInvokeEvent, host: string, port: nu
     }
 
     if (arg) {
-        params.append("a", arg);
+        // Handle named parameters for specific commands
+        if (arg.includes("=")) {
+            // Parse named parameters (e.g., "level=50", "ms=1000", "enable=1")
+            const [name, value] = arg.split("=", 2);
+            params.append(name, value);
+        } else {
+            // For simple numeric arguments (like getoutputtime with "1" or "2")
+            params.append("a", arg);
+        }
     }
 
     const url = `${baseUrl}?${params.toString()}`;
