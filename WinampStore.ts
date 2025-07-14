@@ -106,24 +106,14 @@ export const WinampStore = proxyLazyWebpack(() => {
         }
 
         async setPlaying(playing: boolean) {
-            // Immediately update UI for responsive feedback
-            this.isPlaying = playing;
-            this.emitChange();
-
             try {
-                if (playing) {
-                    await this.client.play();
-                } else {
-                    await this.client.pause();
+                if (await this.client[playing ? "play" : "pause"]()) {
+                    this.isPlaying = playing;
+                    this.emitChange();
                 }
-                // Confirm the state is still correct after the request
-                this.isPlaying = playing;
-                this.emitChange();
             } catch (e) {
                 console.error(`[WinampControls] Failed to ${playing ? "play" : "pause"}:`, e);
                 // Revert the state on error
-                this.isPlaying = !playing;
-                this.emitChange();
             }
         }
 
