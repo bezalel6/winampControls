@@ -3,7 +3,6 @@
     border-bottom: 1px solid var(--border-subtle);
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
 
     --vc-winamp-orange: var(--winamp, #ff6600); /* so custom themes can easily change it */
     --vc-winamp-orange-90: color-mix(in hsl, var(--vc-winamp-orange), transparent 90%);
@@ -150,7 +149,6 @@
     position: relative;
     color: var(--text-default);
     width: 100%;
-    margin-top: 0.5em;
     margin-bottom: 0;
     order: 3; /* Place at bottom */
 }
@@ -258,4 +256,83 @@
 
 .vc-winamp-volume-container:hover .vc-winamp-volume-slider > [class^="slider"] [class^="grabber"] {
     opacity: 1;
+}
+
+/* Visual refresh theme styling - matches spotifyControls pattern */
+.visual-refresh {
+    #vc-winamp-player {
+        padding: 12px;
+        background: var(--bg-overlay-floating, var(--background-base-low, var(--background-base-lower-alt)));
+        margin: 0;
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+    }
+
+    .vc-winamp-song-info-prefix {
+        display: none;
+    }
+
+    .vc-winamp-artist,
+    .vc-winamp-album {
+        color: var(--header-primary);
+    }
+
+    .vc-winamp-secondary-song-info {
+        font-size: 12px;
+    }
+
+    #vc-winamp-progress-bar {
+        position: relative;
+        color: var(--text-default);
+        width: 100%;
+    }
+
+    #vc-winamp-progress-bar > [class^="slider"] {
+        flex-grow: 1;
+        width: 100%;
+        padding: 0 !important;
+    }
+
+    #vc-winamp-progress-bar > [class^="slider"] [class^="bar"] {
+        height: 3px !important;
+        top: calc(12px - 4px / 2 + var(--bar-offset));
+    }
+
+    #vc-winamp-progress-bar > [class^="slider"] [class^="barFill"] {
+        background-color: var(--interactive-active);
+    }
+
+    #vc-winamp-progress-bar > [class^="slider"]:hover [class^="barFill"] {
+        background-color: var(--vc-winamp-orange);
+    }
+
+    #vc-winamp-progress-bar > [class^="slider"] [class^="grabber"] {
+        background-color: var(--interactive-active);
+        width: 16px !important;
+        height: 16px !important;
+        margin-top: calc(17px / -2 + var(--bar-offset) / 2);
+        margin-left: -0.5px;
+    }
+
+    .vc-winamp-progress-time {
+        margin-top: 8px;
+        font-family: var(--font-code);
+    }
+
+    .vc-winamp-button {
+        margin: 0 2px;
+        border-radius: var(--radius-sm);
+    }
+
+    .vc-winamp-repeat-playlist,
+    .vc-winamp-repeat-track,
+    .vc-winamp-shuffle-on {
+        background-color: var(--vc-winamp-orange-90);
+    }
+
+    .vc-winamp-repeat-playlist:hover,
+    .vc-winamp-repeat-track:hover,
+    .vc-winamp-shuffle-on:hover {
+        background-color: var(--vc-winamp-orange-80);
+    }
 }
