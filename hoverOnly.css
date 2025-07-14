@@ -14,3 +14,19 @@
     /* only transition opacity on show to prevent clipping */
     transition-property: height, opacity;
 }
+
+#vc-winamp-progress-bar .vc-winamp-slider {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: 0.2s;
+    transition: max-height 0.3s ease;
+}
+
+#vc-winamp-player:hover #vc-winamp-progress-bar .vc-winamp-slider {
+    opacity: 1;
+    pointer-events: auto;
+    max-height: 500px;
+    /* only transition opacity on show to prevent clipping */
+    transition-property: max-height, opacity;
+}
