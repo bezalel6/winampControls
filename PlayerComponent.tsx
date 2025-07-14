@@ -140,6 +140,7 @@ function WinampSeekBar() {
 
     const [statePosition, setStatePosition] = useState(position);
     const [isDragging, setIsDragging] = useState(false);
+    const [debounceTimeout, setDebounceTimeout] = useState<NodeJS.Timeout | null>(null);
 
     if (!isDragging && position !== statePosition)
         setStatePosition(position);
@@ -150,13 +151,40 @@ function WinampSeekBar() {
         setStatePosition(v);
         setIsDragging(true);
 
-        // Immediately seek to the new position
-        WinampStore.seek(v);
+        // Clear existing timeout
+        if (debounceTimeout) {
+            clearTimeout(debounceTimeout);
+        }
+
+        // Set a new timeout to debounce the seek operation
+        const timeout = setTimeout(() => {
+            WinampStore.seek(v);
+        }, 100); // 100ms debounce
+
+        setDebounceTimeout(timeout);
     };
 
     const onChangeComplete = () => {
         setIsDragging(false);
+
+        // Clear any pending debounced seek and perform final seek
+        if (debounceTimeout) {
+            clearTimeout(debounceTimeout);
+            setDebounceTimeout(null);
+        }
+
+        // Perform final seek on drag complete
+        WinampStore.seek(statePosition);
     };
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceTimeout) {
+                clearTimeout(debounceTimeout);
+            }
+        };
+    }, [debounceTimeout]);
 
     if (!trackLength) return null;
 
