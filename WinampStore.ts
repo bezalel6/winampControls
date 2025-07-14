@@ -280,4 +280,4 @@ export const WinampStore = proxyLazyWebpack(() => {
 });
 
 // Re-export types for convenience
-export type { PlayerState, RepeatMode, Track } from "./WinampClient1";
+export type { PlayerState, RepeatMode, Track } from "./WinampClient";
