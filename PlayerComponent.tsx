@@ -23,7 +23,7 @@ import { classNameFactory } from "@api/Styles";
 import { Flex } from "@components/Flex";
 import { debounce } from "@shared/debounce";
 import { classes } from "@utils/misc";
-import { React, useEffect, useState, useStateFromStores } from "@webpack/common";
+import { React, Slider, useEffect, useState, useStateFromStores } from "@webpack/common";
 
 import { settings } from "./";
 import { SeekBar } from "./SeekBar";
@@ -119,13 +119,14 @@ function Controls() {
             </Button>
             <div className={cl("volume-control")}>
                 <VolumeIcon />
-                <SeekBar
+                <Slider
                     className={cl("volume-slider")}
                     minValue={0}
                     maxValue={100}
                     initialValue={volume}
                     onValueChange={(v: number) => WinampStore.setVolume(v)}
-                    renderMarker={() => null}
+                    onValueRender={(v: number) => `${Math.round(v)}%`}
+                    hideBubble={false}
                 />
             </div>
         </Flex>
@@ -224,8 +225,8 @@ export function Player() {
     return (
         <div id={cl("player")}>
             <TrackInfo track={track} />
-            <WinampSeekBar />
             <Controls />
+            <WinampSeekBar />
         </div>
     );
 }
