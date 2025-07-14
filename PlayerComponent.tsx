@@ -27,7 +27,7 @@ import { React, Slider, useEffect, useState, useStateFromStores } from "@webpack
 
 import { settings } from "./";
 import { SeekBar } from "./SeekBar";
-import { Track, WinampStore } from "./WinampStore";
+import { type Track, WinampStore } from "./WinampStore";
 
 const cl = classNameFactory("vc-winamp-");
 
@@ -155,7 +155,6 @@ function WinampSeekBar() {
             WinampStore.seek(v);
         }, 100);
     };
-
     if (!trackLength) return null;
 
     return (

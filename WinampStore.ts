@@ -19,31 +19,13 @@
 import { proxyLazyWebpack } from "@webpack";
 import { Flux, FluxDispatcher } from "@webpack/common";
 
-export interface Track {
-    id: string;
-    name: string;
-    duration: number;
-    artist: string;
-    album?: string;
-    filePath?: string;
-}
-
-interface PlayerState {
-    track: Track | null;
-    volume: number;
-    isPlaying: boolean;
-    repeat: Repeat;
-    shuffle: boolean;
-    position: number;
-}
+import { type PlayerState, type RepeatMode, type Track, vencordFetch, WinampClient } from "./WinampClient";
 
 interface HttpQConfig {
     host: string;
     port: number;
     password?: string;
 }
-
-type Repeat = "off" | "track" | "playlist";
 
 // Don't wanna run before Flux and Dispatcher are ready!
 export const WinampStore = proxyLazyWebpack(() => {
@@ -54,9 +36,10 @@ export const WinampStore = proxyLazyWebpack(() => {
         public mPosition = 0;
         public _start = 0;
 
+        // Store state now matches the UI-friendly types from winampClient
         public track: Track | null = null;
         public isPlaying = false;
-        public repeat: Repeat = "off";
+        public repeat: RepeatMode = "off";
         public shuffle = false;
         public volume = 0;
 
@@ -68,7 +51,13 @@ export const WinampStore = proxyLazyWebpack(() => {
             password: "pass"
         };
 
+        private client: WinampClient;
         private pollingInterval: number | null = null;
+
+        constructor(dispatcher: any, actionHandlers: any) {
+            super(dispatcher, actionHandlers);
+            this.client = new WinampClient(vencordFetch, this.config.host, this.config.port, this.config.password || "");
+        }
 
         // Need to keep track of this manually
         public get position(): number {
@@ -84,175 +73,126 @@ export const WinampStore = proxyLazyWebpack(() => {
             this._start = Date.now();
         }
 
-        private async httpQRequest(command: string, arg?: string): Promise<string> {
+        async prev() {
             try {
-                const { status, data } = await VencordNative.pluginHelpers.WinampControls.httpQRequest(
-                    this.config.host,
-                    this.config.port,
-                    this.config.password || "",
-                    command,
-                    arg
-                );
-
-                if (status !== 200) {
-                    throw new Error(`HTTP ${status}: ${data}`);
-                }
-
-                return data;
-            } catch (error) {
-                console.error(`[WinampControls] httpQ request failed: ${error}`);
-                throw error;
+                await this.client.prev();
+            } catch (e) {
+                console.error("[WinampControls] Failed to go to previous track:", e);
             }
         }
 
-        prev() {
-            this.httpQRequest("prev").catch(e =>
-                console.error("[WinampControls] Failed to go to previous track:", e)
-            );
+        async next() {
+            try {
+                await this.client.next();
+            } catch (e) {
+                console.error("[WinampControls] Failed to go to next track:", e);
+            }
         }
 
-        next() {
-            this.httpQRequest("next").catch(e =>
-                console.error("[WinampControls] Failed to go to next track:", e)
-            );
-        }
-
-        setVolume(percent: number) {
+        async setVolume(percent: number) {
             // Immediately update UI for responsive feedback
             this.volume = percent;
             this.emitChange();
 
-            this.httpQRequest("setvolume", `level=${percent}`).then(() => {
+            try {
+                await this.client.setVolume(percent);
                 // Confirm the state is still correct after the request
                 this.volume = percent;
                 this.emitChange();
-            }).catch(e => {
+            } catch (e) {
                 console.error("[WinampControls] Failed to set volume:", e);
                 // Note: We don't revert volume on error as it's less critical
-            });
+            }
         }
 
-        setPlaying(playing: boolean) {
+        async setPlaying(playing: boolean) {
             // Immediately update UI for responsive feedback
             this.isPlaying = playing;
             this.emitChange();
 
-            const command = playing ? "play" : "pause";
-            this.httpQRequest(command).then(() => {
+            try {
+                if (playing) {
+                    await this.client.play();
+                } else {
+                    await this.client.pause();
+                }
                 // Confirm the state is still correct after the request
                 this.isPlaying = playing;
                 this.emitChange();
-            }).catch(e => {
-                console.error(`[WinampControls] Failed to ${command}:`, e);
+            } catch (e) {
+                console.error(`[WinampControls] Failed to ${playing ? "play" : "pause"}:`, e);
                 // Revert the state on error
                 this.isPlaying = !playing;
                 this.emitChange();
-            });
+            }
         }
 
-        setRepeat(state: Repeat) {
-            // HttpQ doesn't have direct repeat control, so we'll track it locally
-            this.repeat = state;
-            this.emitChange();
-            console.log(`[WinampControls] Repeat mode set to ${state} (tracked locally)`);
+        async setRepeat(state: RepeatMode) {
+            try {
+                await this.client.setRepeat(state);
+                this.repeat = state;
+                this.emitChange();
+            } catch (e) {
+                console.error("[WinampControls] Failed to set repeat:", e);
+                // Fallback to local tracking
+                this.repeat = state;
+                this.emitChange();
+            }
         }
 
-        setShuffle(state: boolean) {
-            this.httpQRequest("shuffle", `enable=${state ? "1" : "0"}`).then(() => {
+        async setShuffle(state: boolean) {
+            try {
+                await this.client.setShuffle(state);
                 this.shuffle = state;
                 this.emitChange();
-            }).catch(e => {
+            } catch (e) {
                 console.error("[WinampControls] Failed to set shuffle:", e);
                 // Fallback to local tracking
                 this.shuffle = state;
                 this.emitChange();
-            });
+            }
         }
 
-        seek(ms: number) {
+        async seek(ms: number) {
             if (this.isSettingPosition) return Promise.resolve();
 
             this.isSettingPosition = true;
 
-            return this.httpQRequest("jumptotime", `ms=${ms}`).then(() => {
+            try {
+                await this.client.seekTo(ms);
                 this.position = ms;
                 this.isSettingPosition = false;
-            }).catch((e: any) => {
+            } catch (e) {
                 console.error("[WinampControls] Failed to seek:", e);
                 this.isSettingPosition = false;
-            });
+            }
         }
 
-        // Get current player state from httpQ
+        // Get current player state - now much simpler since client provides UI-ready data
         public async getCurrentState(): Promise<PlayerState | null> {
             try {
-                const responses = await Promise.all([
-                    this.httpQRequest("isplaying"),
-                    this.httpQRequest("getcurrenttitle"),
-                    this.httpQRequest("getvolume"),
-                    this.httpQRequest("getoutputtime", "1"), // Position in milliseconds
-                    this.httpQRequest("getoutputtime", "2") // Track length in seconds
-                ]);
+                const state = await this.client.getPlayerState();
 
-                const [playStatus, title, volume, position, length] = responses;
+                // Sync local position tracking with API position
+                if (state.track && !this.isSettingPosition) {
+                    this.position = state.position;
+                }
 
-                // Parse the responses (httpQ returns simple text)
-                const playStatusValue = parseInt(playStatus.trim()) || 0;
-                // httpQ isplaying returns: 1 = playing, 0 = not playing, 3 = paused
-                // We treat paused (3) as not playing for UI purposes
-                const isPlaying = playStatusValue === 1;
-                const currentVolume = parseInt(volume.trim()) || 0;
-                const currentPosition = parseInt(position.trim()) || 0; // Already in milliseconds
-                const trackLength = (parseInt(length.trim()) || 0) * 1000; // Convert seconds to ms
-
-                // Parse track info from title (format may vary)
-                const trackInfo = this.parseTrackInfo(title.trim());
-
-                const track: Track = {
-                    id: trackInfo.id,
-                    name: trackInfo.name,
-                    duration: trackLength,
-                    artist: trackInfo.artist,
-                    album: trackInfo.album,
-                    filePath: trackInfo.filePath
-                };
-
-                return {
-                    track,
-                    volume: currentVolume,
-                    isPlaying,
-                    repeat: this.repeat, // Tracked locally
-                    shuffle: this.shuffle, // Tracked locally
-                    position: currentPosition
-                };
+                return state;
             } catch (error) {
                 console.error("[WinampControls] Failed to get current state:", error);
                 return null;
             }
         }
 
-        private parseTrackInfo(title: string): { id: string; name: string; artist: string; album?: string; filePath?: string; } {
-            // Basic parsing - httpQ usually returns "Artist - Title" or just "Title"
-            const parts = title.split(" - ");
-
-            if (parts.length >= 2) {
-                const artist = parts[0].trim();
-                const name = parts.slice(1).join(" - ").trim();
-
-                return {
-                    id: `${artist}-${name}`,
-                    name,
-                    artist,
-                    filePath: title
-                };
+        // Get complete playlist
+        public async getPlaylist(): Promise<Track[]> {
+            try {
+                return await this.client.getPlaylist();
+            } catch (error) {
+                console.error("[WinampControls] Failed to get playlist:", error);
+                return [];
             }
-
-            return {
-                id: title,
-                name: title,
-                artist: "Unknown Artist",
-                filePath: title
-            };
         }
 
         // Start polling for player state updates
@@ -267,10 +207,16 @@ export const WinampStore = proxyLazyWebpack(() => {
                 try {
                     const state = await this.getCurrentState();
                     if (state) {
-                        // Dispatch state update to Flux
+                        // Dispatch state update to Flux - now using UI-ready state directly
                         (FluxDispatcher as any).dispatch({
                             type: "WINAMP_PLAYER_STATE",
-                            ...state
+                            track: state.track,
+                            volume: state.volume,
+                            isPlaying: state.isPlaying,
+                            repeat: state.repeat,
+                            shuffle: state.shuffle,
+                            position: state.position,
+                            isConnected: state.isConnected
                         });
                     }
                 } catch (error) {
@@ -291,24 +237,31 @@ export const WinampStore = proxyLazyWebpack(() => {
         // Configure httpQ connection
         public configure(config: Partial<HttpQConfig>) {
             this.config = { ...this.config, ...config };
+
+            // Recreate the client with new configuration
+            this.client = new WinampClient(vencordFetch, this.config.host, this.config.port, this.config.password || "");
+
             console.log(`[WinampControls] Configured httpQ: ${this.config.host}:${this.config.port}`);
         }
 
         // Test httpQ connection
         public async testConnection(): Promise<boolean> {
             try {
-                await this.httpQRequest("getversion");
-                console.log("[WinampControls] httpQ connection successful");
-                return true;
+                return await this.client.isConnected();
             } catch (error) {
                 console.error("[WinampControls] httpQ connection failed:", error);
                 return false;
             }
         }
+
+        // Get connection state
+        public getConnectionState(): boolean {
+            return this.client.getConnectionState();
+        }
     }
 
     const store = new WinampStore(FluxDispatcher, {
-        WINAMP_PLAYER_STATE(e: PlayerState) {
+        WINAMP_PLAYER_STATE(e: { track: Track | null; volume: number; isPlaying: boolean; repeat: RepeatMode; shuffle: boolean; position: number; isConnected: boolean; }) {
             store.track = e.track;
             store.isPlaying = e.isPlaying ?? false;
             store.volume = e.volume ?? 0;
@@ -325,3 +278,6 @@ export const WinampStore = proxyLazyWebpack(() => {
 
     return store;
 });
+
+// Re-export types for convenience
+export type { PlayerState, RepeatMode, Track } from "./WinampClient1";

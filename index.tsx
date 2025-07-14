@@ -74,6 +74,10 @@ export default definePlugin({
     description: "Adds a Winamp player above the account panel",
     authors: [{ name: "RNDev", id: 1234567890n }],
     settings,
+
+    native: {
+        httpQRequest: "httpQRequest"
+    },
     patches: [
         {
             find: "this.isCopiedStreakGodlike",

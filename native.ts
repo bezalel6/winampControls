@@ -18,28 +18,8 @@
 
 import { IpcMainInvokeEvent } from "electron";
 
-export async function httpQRequest(_: IpcMainInvokeEvent, host: string, port: number, password: string, command: string, arg?: string): Promise<{ status: number; data: string; }> {
-    const baseUrl = `http://${host}:${port}/${command}`;
-    const params = new URLSearchParams();
-
-    if (password) {
-        params.append("p", password);
-    }
-
-    if (arg) {
-        // Handle named parameters for specific commands
-        if (arg.includes("=")) {
-            // Parse named parameters (e.g., "level=50", "ms=1000", "enable=1")
-            const [name, value] = arg.split("=", 2);
-            params.append(name, value);
-        } else {
-            // For simple numeric arguments (like getoutputtime with "1" or "2")
-            params.append("a", arg);
-        }
-    }
-
-    const url = `${baseUrl}?${params.toString()}`;
-
+// Simplified native fetch wrapper - just does HTTP requests
+export async function httpQRequest(_: IpcMainInvokeEvent, url: string): Promise<{ status: number; data: string; }> {
     try {
         const response = await fetch(url);
         const data = await response.text();
