@@ -22,7 +22,7 @@ import "./visualRefreshWinampStyles.css";
 import { classNameFactory } from "@api/Styles";
 import { Flex } from "@components/Flex";
 import { classes } from "@utils/misc";
-import { React, Slider, useEffect, useRef, useState, useStateFromStores } from "@webpack/common";
+import { React, Slider, useEffect, useState, useStateFromStores } from "@webpack/common";
 
 import { settings } from "./";
 import { SeekBar } from "./SeekBar";
@@ -140,7 +140,6 @@ function WinampSeekBar() {
 
     const [statePosition, setStatePosition] = useState(position);
     const [isDragging, setIsDragging] = useState(false);
-    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     if (!isDragging && position !== statePosition)
         setStatePosition(position);
@@ -151,17 +150,14 @@ function WinampSeekBar() {
         setStatePosition(v);
         setIsDragging(true);
 
-        // Clear any existing timeout
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-        }
-
-        // Set a new timeout to seek after user stops dragging
-        timeoutRef.current = setTimeout(() => {
-            setIsDragging(false);
-            WinampStore.seek(v);
-        }, 10);
+        // Immediately seek to the new position
+        WinampStore.seek(v);
     };
+
+    const onChangeComplete = () => {
+        setIsDragging(false);
+    };
+
     if (!trackLength) return null;
 
     return (
@@ -172,6 +168,8 @@ function WinampSeekBar() {
                 maxValue={trackLength}
                 initialValue={statePosition}
                 onValueChange={onChange}
+                asValueChanges={onChange}
+                onValueRender={msToHuman}
             />
             <div id={cl("progress-text")}>
                 <span

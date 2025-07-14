@@ -164,16 +164,14 @@ export class WinampClient {
         return `${baseUrl}?${urlParams.toString()}`;
     }
 
-    // Generic endpoint caller with full type safety
-    async call<T extends EndpointName>(
+    private async call<T extends keyof WinampEndpoints>(
         endpoint: T,
-        params: EndpointParams<T>
-    ): Promise<EndpointResponse<T>> {
+        params: WinampEndpoints[T]["params"]
+    ): Promise<WinampEndpoints[T]["response"]> {
+        const url = this.buildUrl(endpoint, params);
+
         try {
-            const url = this.buildUrl(endpoint, params);
-            console.log(`[WinampClient] Calling endpoint: ${endpoint} with params:`, params);
             const { status, data } = await this.fetchFn(url);
-            console.log(`[WinampClient] Raw response - status: ${status}, data: "${data}"`);
 
             if (status !== 200) {
                 this.isConnectedState = false;
@@ -181,14 +179,35 @@ export class WinampClient {
             }
 
             this.isConnectedState = true;
-            const parsedResponse = this.parseResponse(data.trim());
-            console.log("[WinampClient] Parsed response:", parsedResponse);
-            return parsedResponse as EndpointResponse<T>;
+            const trimmedData = data.trim();
+
+            // Only log individual calls for non-polling operations or errors
+            if (!this.isPollingCall(endpoint)) {
+                console.log(`[WinampClient] ${endpoint}: ${this.formatLogData(trimmedData)}`);
+            }
+
+            return this.parseResponse(endpoint, trimmedData);
         } catch (error) {
             this.isConnectedState = false;
-            console.error(`[WinampClient] Call failed for ${endpoint}:`, error);
-            throw new Error(`Winamp API call failed (${endpoint}): ${error instanceof Error ? error.message : "Unknown error"}`);
+            console.error(`[WinampClient] ${endpoint} failed:`, error);
+            throw error;
         }
+    }
+
+    private isPollingCall(endpoint: string): boolean {
+        const pollingEndpoints = [
+            "isplaying", "getoutputtime", "getvolume", "getlistpos", "getlistlength",
+            "repeat_status", "shuffle_status", "getcurrenttitle", "getplaylistfile", "hasid3tag"
+        ];
+        return pollingEndpoints.includes(endpoint);
+    }
+
+    private formatLogData(data: string): string {
+        // Truncate very long paths/strings for readability
+        if (data.length > 50) {
+            return `${data.substring(0, 50)}...`;
+        }
+        return data;
     }
 
     // Get complete player state - consolidated for UI use
@@ -213,7 +232,7 @@ export class WinampClient {
             // Get track metadata if available
             const track = await this.buildTrackInfo(title, file, playlistPos, length);
 
-            return {
+            const state: PlayerState = {
                 track,
                 isPlaying: status === 1,
                 isPaused: status === 3,
@@ -228,10 +247,23 @@ export class WinampClient {
                 shuffle: shuffle === 1,
                 isConnected: this.isConnectedState
             };
+
+            // Log a single consolidated polling update
+            if (track) {
+                console.log(`[WinampClient] Poll: "${track.name}" by ${track.artist} | ${this.formatTime(position)}/${this.formatTime(length)} | Vol: ${Math.round((volume / 255) * 100)}% | ${status === 1 ? "Playing" : status === 3 ? "Paused" : "Stopped"}`);
+            }
+
+            return state;
         } catch (error) {
             this.isConnectedState = false;
             throw new Error(`Failed to get player state: ${error instanceof Error ? error.message : "Unknown error"}`);
         }
+    }
+
+    private formatTime(ms: number): string {
+        const minutes = Math.floor(ms / 60000);
+        const seconds = Math.floor((ms % 60000) / 1000);
+        return `${minutes}:${seconds.toString().padStart(2, "0")}`;
     }
 
     // Get current playback position in milliseconds
@@ -352,49 +384,49 @@ export class WinampClient {
 
     // Playback control helpers
     async play(): Promise<boolean> {
+        console.log("[WinampClient] Play");
         return (await this.call("play", {})) === 1;
     }
 
     async pause(): Promise<boolean> {
+        console.log("[WinampClient] Pause");
         return (await this.call("pause", {})) === 1;
     }
 
     async stop(): Promise<boolean> {
+        console.log("[WinampClient] Stop");
         return (await this.call("stop", {})) === 1;
     }
 
     async next(): Promise<boolean> {
+        console.log("[WinampClient] Next track");
         return (await this.call("next", {})) === 1;
     }
 
     async prev(): Promise<boolean> {
+        console.log("[WinampClient] Previous track");
         return (await this.call("prev", {})) === 1;
     }
 
     async setVolume(level: number): Promise<boolean> {
-        return (await this.call("setvolume", { level: Math.max(0, Math.min(255, level)) })) === 1;
+        const clampedLevel = Math.max(0, Math.min(255, level));
+        console.log(`[WinampClient] Volume: ${Math.round((clampedLevel / 255) * 100)}%`);
+        return (await this.call("setvolume", { level: clampedLevel })) === 1;
     }
 
     // Enhanced repeat control with UI-friendly modes
     async setRepeat(mode: RepeatMode): Promise<boolean> {
-        const wasEnabled = await this.call("repeat_status", {});
-
-        switch (mode) {
-            case "off":
-                if (wasEnabled) {
-                    await this.call("repeat", { enable: 0 });
-                }
-                break;
-            case "track":
-            case "playlist":
-                if (!wasEnabled) {
-                    await this.call("repeat", { enable: 1 });
-                }
-                break;
-        }
-
+        console.log(`[WinampClient] Repeat: ${mode.toUpperCase()}`);
         this.repeatMode = mode;
-        return true;
+
+        if (mode === "off") {
+            return (await this.call("repeat", { enable: 0 })) === 1;
+        } else {
+            // Enable repeat first, then set the mode
+            const result = (await this.call("repeat", { enable: 1 })) === 1;
+            // Note: httpQ API doesn't distinguish between track/playlist repeat, we track it locally
+            return result;
+        }
     }
 
     async toggleRepeat(): Promise<RepeatMode> {
@@ -405,6 +437,7 @@ export class WinampClient {
     }
 
     async setShuffle(enabled: boolean): Promise<boolean> {
+        console.log(`[WinampClient] Shuffle: ${enabled ? "ON" : "OFF"}`);
         return (await this.call("shuffle", { enable: enabled ? 1 : 0 })) === 1;
     }
 
@@ -415,8 +448,9 @@ export class WinampClient {
         return newStatus === 1;
     }
 
-    async seekTo(milliseconds: number): Promise<boolean> {
-        return (await this.call("jumptotime", { ms: Math.max(0, milliseconds) })) === 1;
+    async seekTo(ms: number): Promise<boolean> {
+        console.log(`[WinampClient] Seeking to ${this.formatTime(ms)}`);
+        return (await this.call("jumptotime", { ms })) === 1;
     }
 
     async setPlaylistPosition(index: number): Promise<boolean> {
@@ -424,7 +458,7 @@ export class WinampClient {
     }
 
     // Helper methods
-    private parseResponse(text: string): string | number | BooleanResponse | PlaybackStatus {
+    private parseResponse(endpoint: string, text: string): string | number | BooleanResponse | PlaybackStatus {
         if (text === "") return "";
 
         const numericValue = Number(text);

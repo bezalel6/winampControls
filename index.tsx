@@ -19,6 +19,7 @@
 import { definePluginSettings } from "@api/Settings";
 import { disableStyle, enableStyle } from "@api/Styles";
 import ErrorBoundary from "@components/ErrorBoundary";
+import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 
 import hoverOnlyStyle from "./hoverOnly.css?managed";
@@ -72,9 +73,8 @@ export const settings = definePluginSettings({
 export default definePlugin({
     name: "WinampControls",
     description: "Adds a Winamp player above the account panel",
-    authors: [{ name: "RNDev", id: 1234567890n }],
+    authors: [Devs.RNDev],
     settings,
-
     native: {
         httpQRequest: "httpQRequest"
     },

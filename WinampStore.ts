@@ -154,17 +154,25 @@ export const WinampStore = proxyLazyWebpack(() => {
         }
 
         async seek(ms: number) {
-            if (this.isSettingPosition) return Promise.resolve();
+            console.log(`[WinampStore] Seek called with ${ms}ms, isSettingPosition: ${this.isSettingPosition}`);
+
+            if (this.isSettingPosition) {
+                console.log("[WinampStore] Seek blocked - already setting position");
+                return Promise.resolve();
+            }
 
             this.isSettingPosition = true;
+            console.log("[WinampStore] Starting seek operation");
 
             try {
                 await this.client.seekTo(ms);
                 this.position = ms;
-                this.isSettingPosition = false;
+                console.log(`[WinampStore] Seek completed successfully to ${ms}ms`);
             } catch (e) {
                 console.error("[WinampControls] Failed to seek:", e);
+            } finally {
                 this.isSettingPosition = false;
+                console.log("[WinampStore] Seek operation finished, isSettingPosition reset");
             }
         }
 
@@ -269,7 +277,7 @@ export const WinampStore = proxyLazyWebpack(() => {
             store.shuffle = e.shuffle ?? false;
             store.position = e.position ?? 0;
             store.isSettingPosition = false;
-            store.emitChange();
+            (store as any).emitChange();
         }
     } as any);
 
