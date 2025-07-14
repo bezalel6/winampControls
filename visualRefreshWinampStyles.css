@@ -1,6 +1,6 @@
-/* TODO: merge with spotifyStyles.css and remove when old UI is discontinued */
+/* TODO: merge with winampStyles.css and remove when old UI is discontinued */
 .visual-refresh {
-    #vc-spotify-player {
+    #vc-winamp-player {
         padding: 12px;
         background: var(--bg-overlay-floating, var(--background-base-low, var(--background-base-lower-alt)));
         margin: 0;
@@ -8,70 +8,77 @@
         border-top-right-radius: 10px;
     }
 
-    .vc-spotify-song-info-prefix {
+    .vc-winamp-song-info-prefix {
         display: none;
     }
 
-    .vc-spotify-artist, .vc-spotify-album {
+    .vc-winamp-artist,
+    .vc-winamp-album {
         color: var(--header-primary);
     }
 
-    .vc-spotify-secondary-song-info {
+    .vc-winamp-secondary-song-info {
         font-size: 12px;
     }
 
-    #vc-spotify-progress-bar {
+    #vc-winamp-progress-bar {
         position: relative;
         color: var(--text-default);
         width: 100%;
     }
 
-    #vc-spotify-progress-bar > [class^="slider"] {
+    #vc-winamp-progress-bar > [class^="slider"] {
         flex-grow: 1;
-        width: 100%;
-        padding: 0 !important;
+        margin: 0 8px;
     }
 
-    #vc-spotify-progress-bar > [class^="slider"] [class^="bar"] {
-        height: 3px !important;
-        top: calc(12px - 4px / 2 + var(--bar-offset));
+    #vc-winamp-progress-bar > [class^="slider"] [class^="bar"] {
+        background: var(--background-secondary);
+        border-radius: 2px;
+        height: 4px;
     }
 
-    #vc-spotify-progress-bar > [class^="slider"] [class^="barFill"] {
-        background-color: var(--interactive-active);
+    #vc-winamp-progress-bar > [class^="slider"] [class^="barFill"] {
+        background: var(--text-default);
+        border-radius: 2px;
     }
 
-    #vc-spotify-progress-bar > [class^="slider"]:hover [class^="barFill"] {
-        background-color: var(--vc-spotify-green);
+    #vc-winamp-progress-bar > [class^="slider"]:hover [class^="barFill"] {
+        background: var(--brand-500);
     }
 
-    #vc-spotify-progress-bar > [class^="slider"] [class^="grabber"] {
-        background-color: var(--interactive-active);
-        width: 16px !important;
-        height: 16px !important;
-        margin-top: calc(17px/-2 + var(--bar-offset)/2);
-        margin-left: -0.5px;
+    #vc-winamp-progress-bar > [class^="slider"] [class^="grabber"] {
+        background: var(--text-default);
+        border-radius: 10px;
+        height: 10px;
+        width: 10px;
+        margin-left: -5px;
+        margin-top: -3px;
     }
 
-    .vc-spotify-progress-time {
-        margin-top: 8px;
-        font-family: var(--font-code);
+    .vc-winamp-progress-time {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin: 0 8px;
     }
 
-    .vc-spotify-button-row {
-        margin-top: 14px;
+    .vc-winamp-button-row {
+        justify-content: center;
     }
 
-    .vc-spotify-button {
-        margin: 0 2px;
-        border-radius: var(--radius-sm);
+    .vc-winamp-button {
+        color: var(--interactive-normal);
     }
 
-    .vc-spotify-repeat-context, .vc-spotify-repeat-track, .vc-spotify-shuffle-on {
-        background-color: var(--vc-spotify-green-90);
+    .vc-winamp-repeat-playlist,
+    .vc-winamp-repeat-track,
+    .vc-winamp-shuffle-on {
+        color: var(--brand-500);
     }
 
-    .vc-spotify-repeat-context:hover, .vc-spotify-repeat-track:hover, .vc-spotify-shuffle-on:hover {
-        background-color: var(--vc-spotify-green-80);
+    .vc-winamp-repeat-playlist:hover,
+    .vc-winamp-repeat-track:hover,
+    .vc-winamp-shuffle-on:hover {
+        color: var(--brand-600);
     }
 }

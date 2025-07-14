@@ -19,13 +19,13 @@
 import "./winampStyles.css";
 import "./visualRefreshWinampStyles.css";
 
-import { Settings } from "@api/Settings";
 import { classNameFactory } from "@api/Styles";
 import { Flex } from "@components/Flex";
 import { debounce } from "@shared/debounce";
 import { classes } from "@utils/misc";
 import { React, useEffect, useState, useStateFromStores } from "@webpack/common";
 
+import { settings } from "./";
 import { SeekBar } from "./SeekBar";
 import { Track, WinampStore } from "./WinampStore";
 
@@ -100,7 +100,7 @@ function Controls() {
                 <Shuffle />
             </Button>
             <Button onClick={() => {
-                Settings.plugins.WinampControls.previousButtonRestartsTrack && WinampStore.position > 3000 ? WinampStore.seek(0) : WinampStore.prev();
+                settings.store.previousButtonRestartsTrack && WinampStore.position > 3000 ? WinampStore.seek(0) : WinampStore.prev();
             }}>
                 <SkipPrev />
             </Button>

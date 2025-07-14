@@ -16,35 +16,64 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { Settings } from "@api/Settings";
+import { definePluginSettings } from "@api/Settings";
 import { disableStyle, enableStyle } from "@api/Styles";
 import ErrorBoundary from "@components/ErrorBoundary";
 import definePlugin, { OptionType } from "@utils/types";
 
 import hoverOnlyStyle from "./hoverOnly.css?managed";
 import { Player } from "./PlayerComponent";
+import { WinampStore } from "./WinampStore";
 
 function toggleHoverControls(value: boolean) {
     (value ? enableStyle : disableStyle)(hoverOnlyStyle);
 }
 
+function updateHttpQConfig() {
+    WinampStore.configure({
+        host: settings.store.httpqHost,
+        port: settings.store.httpqPort,
+        password: settings.store.httpqPassword
+    });
+}
+
+export const settings = definePluginSettings({
+    hoverControls: {
+        description: "Show controls on hover",
+        type: OptionType.BOOLEAN,
+        default: false,
+        onChange: v => toggleHoverControls(v)
+    },
+    previousButtonRestartsTrack: {
+        type: OptionType.BOOLEAN,
+        description: "Restart currently playing track when pressing the previous button if playtime is >3s",
+        default: true
+    },
+    httpqHost: {
+        type: OptionType.STRING,
+        description: "HttpQ server host/IP address",
+        default: "127.0.0.1",
+        onChange: updateHttpQConfig
+    },
+    httpqPort: {
+        type: OptionType.NUMBER,
+        description: "HttpQ server port",
+        default: 4800,
+        onChange: updateHttpQConfig
+    },
+    httpqPassword: {
+        type: OptionType.STRING,
+        description: "HttpQ server password",
+        default: "pass",
+        onChange: updateHttpQConfig
+    }
+});
+
 export default definePlugin({
     name: "WinampControls",
     description: "Adds a Winamp player above the account panel",
     authors: [{ name: "RNDev", id: 1234567890n }],
-    options: {
-        hoverControls: {
-            description: "Show controls on hover",
-            type: OptionType.BOOLEAN,
-            default: false,
-            onChange: v => toggleHoverControls(v)
-        },
-        previousButtonRestartsTrack: {
-            type: OptionType.BOOLEAN,
-            description: "Restart currently playing track when pressing the previous button if playtime is >3s",
-            default: true
-        }
-    },
+    settings,
     patches: [
         {
             find: "this.isCopiedStreakGodlike",
@@ -57,7 +86,10 @@ export default definePlugin({
         }
     ],
 
-    start: () => toggleHoverControls(Settings.plugins.WinampControls.hoverControls),
+    start: () => {
+        toggleHoverControls(settings.store.hoverControls);
+        updateHttpQConfig();
+    },
 
     PanelWrapper({ VencordOriginal, ...props }) {
         return (
