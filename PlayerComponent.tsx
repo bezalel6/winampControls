@@ -208,7 +208,7 @@ export function Player() {
         setShouldHide(!isWinampAvailable && !isPlaying);
     }, [track, isPlaying]);
 
-    if (shouldHide) return null;
+    if (shouldHide || !track) return null;
 
     return (
         <div id={cl("player")}>

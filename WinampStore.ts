@@ -84,30 +84,21 @@ export const WinampStore = proxyLazyWebpack(() => {
             this._start = Date.now();
         }
 
-        private getHttpQUrl(command: string, arg?: string): string {
-            const baseUrl = `http://${this.config.host}:${this.config.port}/${command}`;
-            const params = new URLSearchParams();
-
-            if (this.config.password) {
-                params.append("p", this.config.password);
-            }
-
-            if (arg) {
-                params.append("a", arg);
-            }
-
-            return `${baseUrl}?${params.toString()}`;
-        }
-
         private async httpQRequest(command: string, arg?: string): Promise<string> {
-            const url = this.getHttpQUrl(command, arg);
-
             try {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const { status, data } = await VencordNative.pluginHelpers.WinampControls.httpQRequest(
+                    this.config.host,
+                    this.config.port,
+                    this.config.password || "",
+                    command,
+                    arg
+                );
+
+                if (status !== 200) {
+                    throw new Error(`HTTP ${status}: ${data}`);
                 }
-                return await response.text();
+
+                return data;
             } catch (error) {
                 console.error(`[WinampControls] httpQ request failed: ${error}`);
                 throw error;
