@@ -196,10 +196,14 @@ function WinampSeekBar() {
                     {msToHuman(statePosition)}
                 </span>
                 <span
+                    className={cl("progress-time")}
+                    style={{ userSelect: "text" }}
+                >/</span>
+                <span
                     className={cl("progress-time", "time-right")}
                     style={{ userSelect: "text" }}
                 >
-                    {msToHuman(trackLength - statePosition)}
+                    {msToHuman(trackLength)}
                 </span>
             </div>
         </div>

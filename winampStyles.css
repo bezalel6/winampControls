@@ -213,8 +213,12 @@
 }
 
 #vc-winamp-progress-text {
-    margin: 0;
+    display: flex;
+    margin: auto auto;
     margin-top: var(--vc-winamp-spacing-sm);
+    /* width: 100%; */
+    justify-content: space-between;
+    transition: 0.2s width;
 }
 
 .vc-winamp-progress-time {
@@ -222,14 +226,6 @@
     font-family: var(--vc-winamp-font-family-code);
     position: relative;
     display: inline-block;
-}
-
-.vc-winamp-time-left {
-    float: left;
-}
-
-.vc-winamp-time-right {
-    float: right;
 }
 
 /* Volume control styling - matches progress bar structure */

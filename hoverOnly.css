@@ -14,6 +14,12 @@
     /* only transition opacity on show to prevent clipping */
     transition-property: height, opacity;
 }
+#vc-winamp-progress-text {
+    width: 50%;
+}
+#vc-winamp-player:hover #vc-winamp-progress-text {
+    width: 100%;
+}
 
 #vc-winamp-progress-bar .vc-winamp-slider {
     max-height: 0;
