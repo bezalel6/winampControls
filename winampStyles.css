@@ -181,7 +181,7 @@
     /* these importants are necessary, it applies a width and height through inline styles */
     height: 10px !important;
     width: 10px !important;
-    margin-top: 4px;
+    margin-top: -3px;
     background-color: var(--interactive-normal);
     border-color: var(--interactive-normal);
     color: var(--interactive-normal);
@@ -237,25 +237,25 @@
     align-items: center;
 }
 
-.vc-winamp-volume-slider [class*="track"] {
-    height: 4px;
-    background: var(--background-modifier-accent);
-    border-radius: 2px;
-    position: relative;
+.vc-winamp-volume-slider > [class^="slider"] [class^="grabber"] {
+    height: 12px !important;
+    width: 12px !important;
+    background: var(--interactive-normal) !important;
+    border: 2px solid var(--interactive-normal) !important;
+    border-radius: 50% !important;
+    position: absolute !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    margin-top: 0 !important;
+    opacity: 0;
+    transition: opacity 0.1s;
 }
 
-.vc-winamp-volume-slider [class*="slider"] [class*="grabber"] {
-    height: 12px;
-    width: 12px;
-    background: var(--interactive-normal);
-    border: 2px solid var(--interactive-normal);
-    border-radius: 50%;
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
+.vc-winamp-volume-slider > [class^="slider"] [class^="grabber"]:hover {
+    background: var(--interactive-hover) !important;
+    border-color: var(--interactive-hover) !important;
 }
 
-.vc-winamp-volume-slider [class*="slider"] [class*="grabber"]:hover {
-    background: var(--interactive-hover);
-    border-color: var(--interactive-hover);
+.vc-winamp-volume-container:hover .vc-winamp-volume-slider > [class^="slider"] [class^="grabber"] {
+    opacity: 1;
 }

@@ -47,13 +47,17 @@
         background: var(--brand-500);
     }
 
+    .vc-winamp-volume-slider [class*="slider"] [class*="grabber"] {
+        background-color: var(--interactive-active) !important;
+        border-radius: var(--radius-sm);
+    }
+
     #vc-winamp-progress-bar > [class^="slider"] [class^="grabber"] {
-        background: var(--text-default);
-        border-radius: 10px;
-        height: 10px;
-        width: 10px;
-        margin-left: -5px;
-        margin-top: -3px;
+        background-color: var(--interactive-active);
+        width: 16px !important;
+        height: 16px !important;
+        margin-top: calc(17px / -2 + var(--bar-offset) / 2);
+        margin-left: -0.5px;
     }
 
     .vc-winamp-progress-time {
