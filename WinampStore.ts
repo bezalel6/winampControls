@@ -19,13 +19,7 @@
 import { proxyLazyWebpack } from "@webpack";
 import { Flux, FluxDispatcher } from "@webpack/common";
 
-import { type PlayerState, type RepeatMode, type Track, vencordFetch, WinampClient } from "./WinampClient";
-
-interface HttpQConfig {
-    host: string;
-    port: number;
-    password?: string;
-}
+import { ConsecutiveFailuresError, type HTTPQConfig, type PlayerState, type RepeatMode, type Track, vencordFetch, WinampClient } from "./WinampClient";
 
 // Don't wanna run before Flux and Dispatcher are ready!
 export const WinampStore = proxyLazyWebpack(() => {
@@ -44,8 +38,10 @@ export const WinampStore = proxyLazyWebpack(() => {
         public volume = 0;
 
         public isSettingPosition = false;
+        public isPollingEnabled = true; // Track if polling should be active
+        public lastConsecutiveFailure: ConsecutiveFailuresError | null = null;
 
-        private config: HttpQConfig = {
+        private config: HTTPQConfig = {
             host: "127.0.0.1",
             port: 4800,
             password: "pass"
@@ -56,7 +52,7 @@ export const WinampStore = proxyLazyWebpack(() => {
 
         constructor(dispatcher: any, actionHandlers: any) {
             super(dispatcher, actionHandlers);
-            this.client = new WinampClient(vencordFetch, this.config.host, this.config.port, this.config.password || "");
+            this.client = new WinampClient(vencordFetch, this.config);
         }
 
         // Need to keep track of this manually
@@ -197,8 +193,14 @@ export const WinampStore = proxyLazyWebpack(() => {
             }
 
             console.log("[WinampControls] Starting state polling");
+            this.isPollingEnabled = true;
+            this.lastConsecutiveFailure = null;
 
             this.pollingInterval = window.setInterval(async () => {
+                if (!this.isPollingEnabled) {
+                    return;
+                }
+
                 try {
                     const state = await this.getCurrentState();
                     if (state) {
@@ -215,7 +217,25 @@ export const WinampStore = proxyLazyWebpack(() => {
                         });
                     }
                 } catch (error) {
-                    console.error("[WinampControls] Polling error:", error);
+                    if (error instanceof ConsecutiveFailuresError) {
+                        console.error(`[WinampControls] Stopping polling due to consecutive failures: ${error.message}`);
+                        this.lastConsecutiveFailure = error;
+                        this.isPollingEnabled = false;
+
+                        // Dispatch disconnected state
+                        (FluxDispatcher as any).dispatch({
+                            type: "WINAMP_PLAYER_STATE",
+                            track: null,
+                            volume: 0,
+                            isPlaying: false,
+                            repeat: "off",
+                            shuffle: false,
+                            position: 0,
+                            isConnected: false
+                        });
+                    } else {
+                        console.error("[WinampControls] Polling error:", error);
+                    }
                 }
             }, 1000) as unknown as number; // Poll every second
         }
@@ -227,15 +247,56 @@ export const WinampStore = proxyLazyWebpack(() => {
                 this.pollingInterval = null;
                 console.log("[WinampControls] Stopped state polling");
             }
+            this.isPollingEnabled = false;
+        }
+
+        // Attempt to reconnect after consecutive failures
+        public async attemptReconnection(): Promise<boolean> {
+            try {
+                console.log("[WinampControls] Attempting to reconnect...");
+
+                // Reset the failure count on the client
+                this.client.resetFailureCount();
+
+                // Test the connection
+                const isConnected = await this.client.isConnected();
+
+                if (isConnected) {
+                    console.log("[WinampControls] Reconnection successful, resuming polling");
+                    this.isPollingEnabled = true;
+                    this.lastConsecutiveFailure = null;
+                    return true;
+                } else {
+                    console.log("[WinampControls] Reconnection failed");
+                    return false;
+                }
+            } catch (error) {
+                console.error("[WinampControls] Reconnection attempt failed:", error);
+                return false;
+            }
+        }
+
+        // Get status of polling and last failure
+        public getPollingStatus(): { isEnabled: boolean; lastFailure: ConsecutiveFailuresError | null; consecutiveFailures: number; } {
+            return {
+                isEnabled: this.isPollingEnabled,
+                lastFailure: this.lastConsecutiveFailure,
+                consecutiveFailures: this.client.getConsecutiveFailures()
+            };
         }
 
         // Configure httpQ connection
-        public configure(config: Partial<HttpQConfig>) {
+        public configure(config: Partial<HTTPQConfig>) {
             this.config = { ...this.config, ...config };
 
             // Recreate the client with new configuration
-            this.client = new WinampClient(vencordFetch, this.config.host, this.config.port, this.config.password || "");
+            this.client = new WinampClient(vencordFetch, this.config);
 
+            // Reset polling state when configuration changes
+            this.isPollingEnabled = true;
+            this.lastConsecutiveFailure = null;
+
+            this.startStatePolling();
             console.log(`[WinampControls] Configured httpQ: ${this.config.host}:${this.config.port}`);
         }
 
@@ -249,9 +310,34 @@ export const WinampStore = proxyLazyWebpack(() => {
             }
         }
 
+        // Test httpQ connection with specific configuration
+        public async testConfig(config: HTTPQConfig): Promise<boolean> {
+            try {
+                return await WinampClient.testConfig(vencordFetch, config);
+            } catch (error) {
+                console.error("[WinampControls] httpQ configuration test failed:", error);
+                return false;
+            }
+        }
+
         // Get connection state
         public getConnectionState(): boolean {
             return this.client.getConnectionState();
+        }
+
+        // Get current configuration
+        public getConfig(): HTTPQConfig {
+            return this.client.getConfig();
+        }
+
+        // Static method to test connection with given config
+        static async testConnection(config: HTTPQConfig): Promise<boolean> {
+            try {
+                return await WinampClient.testConfig(vencordFetch, config);
+            } catch (error) {
+                console.error("[WinampStore] Static connection test failed:", error);
+                return false;
+            }
         }
     }
 
@@ -264,7 +350,7 @@ export const WinampStore = proxyLazyWebpack(() => {
             store.shuffle = e.shuffle ?? false;
             store.position = e.position ?? 0;
             store.isSettingPosition = false;
-            (store as any).emitChange();
+            store.emitChange();
         }
     } as any);
 
@@ -275,4 +361,4 @@ export const WinampStore = proxyLazyWebpack(() => {
 });
 
 // Re-export types for convenience
-export type { PlayerState, RepeatMode, Track } from "./WinampClient";
+export type { ConsecutiveFailuresError, HTTPQConfig, PlayerState, RepeatMode, Track } from "./WinampClient";

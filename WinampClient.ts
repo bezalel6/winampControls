@@ -4,6 +4,24 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+// HTTPQConfig interface for connection configuration
+export interface HTTPQConfig {
+    host: string;
+    port: number;
+    password?: string;
+}
+
+// Custom error for consecutive fetch failures
+export class ConsecutiveFailuresError extends Error {
+    public readonly failureCount: number;
+
+    constructor(failureCount: number) {
+        super(`HttpQ connection failed ${failureCount} consecutive times`);
+        this.name = "ConsecutiveFailuresError";
+        this.failureCount = failureCount;
+    }
+}
+
 // Core response types
 export type PlaybackStatus = 0 | 1 | 3; // 0 = stopped, 1 = playing, 3 = paused
 export type BooleanResponse = 0 | 1;
@@ -124,34 +142,27 @@ export interface TrackMetadata {
 
 // Main client class
 export class WinampClient {
-    private host: string;
-    private port: number;
-    private password: string;
+    private config: HTTPQConfig;
     private isConnectedState: boolean = false;
     private repeatMode: RepeatMode = "off"; // Track locally since API only has on/off
     private fetchFn: FetchFunction;
+    private consecutiveFailures: number = 0;
+    private readonly maxConsecutiveFailures: number = 5;
 
-    constructor(
-        fetchFn: FetchFunction,
-        host: string = "localhost",
-        port: number = 4800,
-        password: string = ""
-    ) {
+    constructor(fetchFn: FetchFunction, config: HTTPQConfig) {
         this.fetchFn = fetchFn;
-        this.host = host;
-        this.port = port;
-        this.password = password;
+        this.config = { ...config };
     }
 
     // Build complete URL with parameters for httpQ API
     private buildUrl(endpoint: string, params: Record<string, any>): string {
         // Use the configured host and port for the httpQ API
-        const baseUrl = `http://${this.host}:${this.port}/${endpoint}`;
+        const baseUrl = `http://${this.config.host}:${this.config.port}/${endpoint}`;
         const urlParams = new URLSearchParams();
 
         // Always add password if provided
-        if (this.password) {
-            urlParams.append("p", this.password);
+        if (this.config.password) {
+            urlParams.append("p", this.config.password);
         }
 
         // Add endpoint-specific parameters
@@ -174,23 +185,36 @@ export class WinampClient {
             const { status, data } = await this.fetchFn(url);
 
             if (status !== 200) {
-                this.isConnectedState = false;
+                this.handleCallFailure(endpoint, `HTTP ${status}: ${data}`);
                 throw new Error(`HTTP ${status}: ${data}`);
             }
 
+            // Reset consecutive failures on successful call
+            this.consecutiveFailures = 0;
             this.isConnectedState = true;
             const trimmedData = data.trim();
 
             // Only log individual calls for non-polling operations or errors
             if (!this.isPollingCall(endpoint)) {
-                console.log(`[WinampClient] ${endpoint}: ${this.formatLogData(trimmedData)}`);
+                console.log(`[WinampClient] ${url}: ${this.formatLogData(trimmedData)}`);
             }
 
             return this.parseResponse(endpoint, trimmedData);
         } catch (error) {
-            this.isConnectedState = false;
-            console.error(`[WinampClient] ${endpoint} failed:`, error);
+            this.handleCallFailure(endpoint, error);
             throw error;
+        }
+    }
+
+    private handleCallFailure(endpoint: string, error: any) {
+        this.isConnectedState = false;
+        this.consecutiveFailures++;
+
+        console.error(`[WinampClient] ${endpoint} failed (${this.consecutiveFailures}/${this.maxConsecutiveFailures}):`, error);
+
+        // Throw dedicated error when threshold is reached
+        if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
+            throw new ConsecutiveFailuresError(this.consecutiveFailures);
         }
     }
 
@@ -461,6 +485,11 @@ export class WinampClient {
     private parseResponse(endpoint: string, text: string): string | number | BooleanResponse | PlaybackStatus {
         if (text === "") return "";
 
+        // Special handling for getversion endpoint - "0" means invalid/not available
+        if (endpoint === "getversion" && text === "0") {
+            throw new Error("Winamp httpQ plugin not available or responding with invalid version");
+        }
+
         const numericValue = Number(text);
         if (!isNaN(numericValue)) {
             return numericValue;
@@ -479,17 +508,43 @@ export class WinampClient {
         }
     }
 
+    // Static method to test configuration
+    static async testConfig(fetchFn: FetchFunction, config: HTTPQConfig): Promise<boolean> {
+        try {
+            const client = new WinampClient(fetchFn, config);
+            await client.call("getversion", {});
+            return true;
+        } catch (error) {
+            console.error("[WinampClient] Configuration test failed:", error);
+            return false;
+        }
+    }
+
     // Configuration update
-    public configure(host: string, port: number, password: string = "") {
-        this.host = host;
-        this.port = port;
-        this.password = password;
+    public configure(config: HTTPQConfig) {
+        this.config = { ...config };
         this.isConnectedState = false; // Reset connection state
+    }
+
+    // Get current configuration
+    public getConfig(): HTTPQConfig {
+        return { ...this.config };
     }
 
     // Get current connection state
     public getConnectionState(): boolean {
         return this.isConnectedState;
+    }
+
+    // Reset consecutive failure count (useful for manual reconnection attempts)
+    public resetFailureCount() {
+        this.consecutiveFailures = 0;
+        console.log("[WinampClient] Consecutive failure count reset");
+    }
+
+    // Get current consecutive failure count
+    public getConsecutiveFailures(): number {
+        return this.consecutiveFailures;
     }
 }
 export const browserFetch: FetchFunction = async (url: string) => {

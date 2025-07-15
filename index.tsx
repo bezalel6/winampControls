@@ -19,12 +19,14 @@
 import { definePluginSettings } from "@api/Settings";
 import { disableStyle, enableStyle } from "@api/Styles";
 import ErrorBoundary from "@components/ErrorBoundary";
+import { Flex } from "@components/Flex";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
+import { Button, Forms, React, TextInput } from "@webpack/common";
 
 import hoverOnlyStyle from "./hoverOnly.css?managed";
 import { Player } from "./PlayerComponent";
-import { WinampStore } from "./WinampStore";
+import { type HTTPQConfig, WinampStore } from "./WinampStore";
 
 function toggleHoverControls(value: boolean) {
     (value ? enableStyle : disableStyle)(hoverOnlyStyle);
@@ -36,6 +38,129 @@ function updateHttpQConfig() {
         port: settings.store.httpqPort,
         password: settings.store.httpqPassword
     });
+}
+
+function HttpQServerSettings() {
+    const { httpqHost, httpqPort, httpqPassword } = settings.use(["httpqHost", "httpqPort", "httpqPassword"]);
+    const [buttonState, setButtonState] = React.useState<"normal" | "loading" | "success" | "error">("normal");
+    const [portError, setPortError] = React.useState(false);
+
+    function handleHostChange(value: string) {
+        settings.store.httpqHost = value;
+        setButtonState("normal");
+    }
+
+    function handlePortChange(value: string) {
+        const numValue = parseInt(value);
+        if (!isNaN(numValue) && numValue > 0 && numValue <= 65535) {
+            settings.store.httpqPort = numValue;
+            setPortError(false);
+        } else {
+            setPortError(true);
+        }
+        setButtonState("normal");
+    }
+
+    function handlePasswordChange(value: string) {
+        settings.store.httpqPassword = value;
+        setButtonState("normal");
+    }
+
+    async function testConnection() {
+        setButtonState("loading");
+
+        try {
+            const config: HTTPQConfig = {
+                host: httpqHost,
+                port: httpqPort,
+                password: httpqPassword
+            };
+
+            const isConnected = await WinampStore.testConfig(config);
+
+            if (isConnected) {
+                setButtonState("success");
+                setTimeout(() => setButtonState("normal"), 2000);
+            } else {
+                setButtonState("error");
+                setTimeout(() => setButtonState("normal"), 2000);
+            }
+        } catch (error) {
+            setButtonState("error");
+            setTimeout(() => setButtonState("normal"), 2000);
+        }
+    }
+
+    function getButtonText() {
+        switch (buttonState) {
+            case "loading": return "Testing...";
+            case "success": return "✓ Connected";
+            case "error": return "✗ Failed";
+            default: return "Test Connection";
+        }
+    }
+
+    function getButtonColor() {
+        switch (buttonState) {
+            case "success": return Button.Colors.GREEN;
+            case "error": return Button.Colors.RED;
+            default: return Button.Colors.BRAND;
+        }
+    }
+
+    return (
+        <Forms.FormSection>
+            <Forms.FormTitle tag="h3">HttpQ Server Configuration</Forms.FormTitle>
+            <Forms.FormText type="description" style={{ marginBottom: 12 }}>
+                Configure connection settings for Winamp's HttpQ plugin
+            </Forms.FormText>
+
+            <Forms.FormText type="warning" style={{ marginBottom: 12 }}>
+                ⚠️ You will need to restart Vencord for configuration changes to take effect
+            </Forms.FormText>
+
+            <Flex flexDirection="row" style={{ gap: 12, alignItems: "flex-end" }}>
+                <div style={{ flex: 2 }}>
+                    <Forms.FormTitle tag="h5">Host</Forms.FormTitle>
+                    <TextInput
+                        value={httpqHost}
+                        onChange={handleHostChange}
+                        placeholder="127.0.0.1"
+                    />
+                </div>
+                <div style={{ flex: 1 }}>
+                    <Forms.FormTitle tag="h5">Port</Forms.FormTitle>
+                    <TextInput
+                        type="number"
+                        value={httpqPort}
+                        onChange={handlePortChange}
+                        placeholder="4800"
+                        error={portError ? "Invalid port number" : undefined}
+                    />
+                </div>
+                <div style={{ flex: 1.5 }}>
+                    <Forms.FormTitle tag="h5">Password</Forms.FormTitle>
+                    <TextInput
+                        value={httpqPassword}
+                        onChange={handlePasswordChange}
+                        placeholder="pass"
+                    />
+                </div>
+                <div style={{ flex: 1 }}>
+                    <Button
+                        onClick={testConnection}
+                        submitting={buttonState === "loading"}
+                        disabled={buttonState === "loading" || portError}
+                        size={Button.Sizes.SMALL}
+                        color={getButtonColor()}
+                        style={{ width: "100%" }}
+                    >
+                        {getButtonText()}
+                    </Button>
+                </div>
+            </Flex>
+        </Forms.FormSection>
+    );
 }
 
 export const settings = definePluginSettings({
@@ -50,23 +175,27 @@ export const settings = definePluginSettings({
         description: "Restart currently playing track when pressing the previous button if playtime is >3s",
         default: true
     },
+    httpqSettings: {
+        type: OptionType.COMPONENT,
+        component: HttpQServerSettings
+    },
     httpqHost: {
         type: OptionType.STRING,
         description: "HttpQ server host/IP address",
         default: "127.0.0.1",
-        onChange: updateHttpQConfig
+        hidden: true
     },
     httpqPort: {
         type: OptionType.NUMBER,
         description: "HttpQ server port",
         default: 4800,
-        onChange: updateHttpQConfig
+        hidden: true
     },
     httpqPassword: {
         type: OptionType.STRING,
         description: "HttpQ server password",
         default: "pass",
-        onChange: updateHttpQConfig
+        hidden: true
     }
 });
 
