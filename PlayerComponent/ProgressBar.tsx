@@ -21,7 +21,6 @@ import { useEffect, useState, useStateFromStores } from "@webpack/common";
 
 import { SeekBar } from "../SeekBar";
 import { WinampStore } from "../WinampStore";
-import { PersistentLabel } from "./components/PersistentLabel";
 
 const cl = classNameFactory("vc-winamp-");
 
@@ -33,23 +32,23 @@ function msToHuman(ms: number) {
 }
 
 export function ProgressBar() {
-    const [isSettingPosition, trackLength, position] = useStateFromStores(
+    const [trackLength, position] = useStateFromStores(
         [WinampStore],
-        () => [WinampStore.isSettingPosition, WinampStore.track?.duration, WinampStore.position]
+        () => [WinampStore.track?.duration, WinampStore.position]
     );
 
     const [statePosition, setStatePosition] = useState(position);
-    const [isDragging, setIsDragging] = useState(false);
     const [debounceTimeout, setDebounceTimeout] = useState<NodeJS.Timeout | null>(null);
 
-    if (!isDragging && position !== statePosition)
-        setStatePosition(position);
+    // Update state position when store position changes (only if not currently seeking)
+    useEffect(() => {
+        if (!debounceTimeout) {
+            setStatePosition(position);
+        }
+    }, [position, debounceTimeout]);
 
     const onChange = (v: number) => {
-        if (isSettingPosition) return;
-
         setStatePosition(v);
-        setIsDragging(true);
 
         // Clear existing timeout
         if (debounceTimeout) {
@@ -58,23 +57,11 @@ export function ProgressBar() {
 
         // Set a new timeout to debounce the seek operation
         const timeout = setTimeout(() => {
-            WinampStore.seek(v);
+            WinampStore.executeMediaAction("seek", v);
+            setDebounceTimeout(null);
         }, 100); // 100ms debounce
 
         setDebounceTimeout(timeout);
-    };
-
-    const onChangeComplete = () => {
-        setIsDragging(false);
-
-        // Clear any pending debounced seek and perform final seek
-        if (debounceTimeout) {
-            clearTimeout(debounceTimeout);
-            setDebounceTimeout(null);
-        }
-
-        // Perform final seek on drag complete
-        WinampStore.seek(statePosition);
     };
 
     // Cleanup timeout on unmount
@@ -89,38 +76,36 @@ export function ProgressBar() {
     if (!trackLength) return null;
 
     return (
-        <PersistentLabel enabled={false} direction="below" label="Progress">
-            <div id={cl("progress-bar")}>
-                <SeekBar
-                    className={cl("slider")}
-                    minValue={0}
-                    maxValue={trackLength}
-                    initialValue={statePosition}
-                    onValueChange={onChange}
-                    asValueChanges={onChange}
-                    onValueRender={msToHuman}
-                />
-                <div id={cl("progress-text")}>
-                    <span
-                        className={cl("progress-time", "time-left")}
-                        style={{ userSelect: "text" }}
-                    >
-                        {msToHuman(statePosition)}
-                    </span>
-                    <span
-                        className={cl("progress-time", "progress-divider")}
-                        style={{ userSelect: "text" }}
-                    >
-                        /
-                    </span>
-                    <span
-                        className={cl("progress-time", "time-right")}
-                        style={{ userSelect: "text" }}
-                    >
-                        {msToHuman(trackLength)}
-                    </span>
-                </div>
+        <div id={cl("progress-bar")}>
+            <SeekBar
+                className={cl("slider")}
+                minValue={0}
+                maxValue={trackLength}
+                initialValue={statePosition}
+                onValueChange={onChange}
+                asValueChanges={onChange}
+                onValueRender={msToHuman}
+            />
+            <div id={cl("progress-text")}>
+                <span
+                    className={cl("progress-time", "time-left")}
+                    style={{ userSelect: "text" }}
+                >
+                    {msToHuman(statePosition)}
+                </span>
+                <span
+                    className={cl("progress-time", "progress-divider")}
+                    style={{ userSelect: "text" }}
+                >
+                    /
+                </span>
+                <span
+                    className={cl("progress-time", "time-right")}
+                    style={{ userSelect: "text" }}
+                >
+                    {msToHuman(trackLength)}
+                </span>
             </div>
-        </PersistentLabel>
+        </div>
     );
 }

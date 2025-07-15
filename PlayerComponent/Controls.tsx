@@ -50,32 +50,32 @@ export function Controls() {
             <Tooltip label="Shuffle">
                 <Button
                     className={classes(cl("button"), cl("shuffle"), cl(shuffle ? "shuffle-on" : "shuffle-off"))}
-                    onClick={() => WinampStore.setShuffle(!shuffle)}
+                    onClick={() => WinampStore.executeMediaAction("setShuffle", !shuffle)}
                 >
                     <Shuffle />
                 </Button>
             </Tooltip>
             <Tooltip label="Previous">
                 <Button onClick={() => {
-                    settings.store.previousButtonRestartsTrack && WinampStore.position > 3000 ? WinampStore.seek(0) : WinampStore.prev();
+                    settings.store.previousButtonRestartsTrack && WinampStore.position > 3000 ? WinampStore.executeMediaAction("seek", 0) : WinampStore.executeMediaAction("prev", undefined as void);
                 }}>
                     <SkipPrev />
                 </Button>
             </Tooltip>
             <Tooltip label={isPlaying ? "Pause" : "Play"}>
-                <Button onClick={() => WinampStore.setPlaying(!isPlaying)}>
+                <Button onClick={() => WinampStore.executeMediaAction("setPlaying", !isPlaying)}>
                     {isPlaying ? <PauseButton /> : <PlayButton />}
                 </Button>
             </Tooltip>
             <Tooltip label="Next">
-                <Button onClick={() => WinampStore.next()}>
+                <Button onClick={() => WinampStore.executeMediaAction("next", undefined as void)}>
                     <SkipNext />
                 </Button>
             </Tooltip>
             <Tooltip label="Repeat">
                 <Button
                     className={classes(cl("button"), cl("repeat"), cl(repeatClassName))}
-                    onClick={() => WinampStore.setRepeat(nextRepeat)}
+                    onClick={() => WinampStore.executeMediaAction("setRepeat", nextRepeat)}
                 >
                     <Repeat />
                 </Button>

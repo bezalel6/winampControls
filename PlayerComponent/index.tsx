@@ -30,9 +30,9 @@ import { Volume } from "./Volume";
 const cl = classNameFactory("vc-winamp-");
 
 export function Player() {
-    const [track, volume, isPlaying, isSettingPosition] = useStateFromStores(
+    const [track, volume, isPlaying] = useStateFromStores(
         [WinampStore],
-        () => [WinampStore.track, WinampStore.volume, WinampStore.isPlaying, WinampStore.isSettingPosition]
+        () => [WinampStore.track, WinampStore.volume, WinampStore.isPlaying]
     );
 
     const [shouldHide, setShouldHide] = useState(false);
