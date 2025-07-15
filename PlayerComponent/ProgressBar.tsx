@@ -58,7 +58,7 @@ export function ProgressBar() {
 
         // Set a new timeout to debounce the seek operation
         const timeout = setTimeout(() => {
-            WinampStore.seek(v);
+            WinampStore.executeMediaAction("seek", v);
         }, 100); // 100ms debounce
 
         setDebounceTimeout(timeout);
@@ -74,7 +74,7 @@ export function ProgressBar() {
         }
 
         // Perform final seek on drag complete
-        WinampStore.seek(statePosition);
+        WinampStore.executeMediaAction("seek", statePosition);
     };
 
     // Cleanup timeout on unmount

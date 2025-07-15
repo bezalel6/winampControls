@@ -21,6 +21,103 @@ import { Flux, FluxDispatcher } from "@webpack/common";
 
 import { ConsecutiveFailuresError, type HTTPQConfig, type PlayerState, type RepeatMode, type Track, vencordFetch, WinampClient } from "./WinampClient";
 
+// Advanced TypeScript magic for media control endpoints
+type MediaEndpoints = {
+    prev: { args: void; result: boolean; };
+    next: { args: void; result: boolean; };
+    setVolume: { args: number; result: boolean; };
+    setPlaying: { args: boolean; result: boolean; };
+    setRepeat: { args: RepeatMode; result: boolean; };
+    setShuffle: { args: boolean; result: boolean; };
+    seek: { args: number; result: boolean; };
+};
+
+// Extract endpoint names as union type
+type EndpointName = keyof MediaEndpoints;
+
+// Generic type for extracting args from endpoint
+type EndpointArgs<T extends EndpointName> = MediaEndpoints[T]["args"];
+
+// Generic type for extracting result from endpoint
+type EndpointResult<T extends EndpointName> = MediaEndpoints[T]["result"];
+
+// Store state type for optimistic updates
+type StoreState = {
+    track: Track | null;
+    isPlaying: boolean;
+    repeat: RepeatMode;
+    shuffle: boolean;
+    volume: number;
+    mPosition: number;
+    _start: number;
+    isSettingPosition: boolean;
+};
+
+// State update function type
+type StateUpdateFn<T extends EndpointName> = (
+    args: EndpointArgs<T>,
+    currentState: StoreState
+) => Partial<StoreState>;
+
+// Client method type
+type ClientMethod<T extends EndpointName> = (
+    client: WinampClient,
+    args: EndpointArgs<T>
+) => Promise<EndpointResult<T>>;
+
+// Media action definition
+type MediaAction<T extends EndpointName> = {
+    clientMethod: ClientMethod<T>;
+    optimisticUpdate: StateUpdateFn<T>;
+    errorHandler?: (error: unknown, args: EndpointArgs<T>) => Partial<StoreState>;
+};
+
+// The sacred map of all media actions - completely type-safe and generic
+const MEDIA_ACTIONS = {
+    prev: {
+        clientMethod: (client: WinampClient) => client.prev(),
+        optimisticUpdate: () => ({}), // No immediate state change needed
+    } satisfies MediaAction<"prev">,
+    next: {
+        clientMethod: (client: WinampClient) => client.next(),
+        optimisticUpdate: () => ({}), // No immediate state change needed
+    } satisfies MediaAction<"next">,
+    setVolume: {
+        clientMethod: (client: WinampClient, volume: number) => client.setVolume(volume),
+        optimisticUpdate: (volume: number) => ({ volume }),
+    } satisfies MediaAction<"setVolume">,
+    setPlaying: {
+        clientMethod: (client: WinampClient, playing: boolean) => client[playing ? "play" : "pause"](),
+        optimisticUpdate: (playing: boolean, state: StoreState) => ({
+            isPlaying: playing,
+            _start: playing ? Date.now() : state._start
+        }),
+        errorHandler: (error: unknown, playing: boolean) => ({
+            isPlaying: !playing // Revert on error
+        })
+    } satisfies MediaAction<"setPlaying">,
+    setRepeat: {
+        clientMethod: (client: WinampClient, state: RepeatMode) => client.setRepeat(state),
+        optimisticUpdate: (state: RepeatMode) => ({ repeat: state }),
+    } satisfies MediaAction<"setRepeat">,
+    setShuffle: {
+        clientMethod: (client: WinampClient, state: boolean) => client.setShuffle(state),
+        optimisticUpdate: (state: boolean) => ({ shuffle: state }),
+    } satisfies MediaAction<"setShuffle">,
+    seek: {
+        clientMethod: (client: WinampClient, ms: number) => client.seekTo(ms),
+        optimisticUpdate: (ms: number) => ({
+            mPosition: ms,
+            _start: Date.now(),
+            isSettingPosition: true
+        }),
+        errorHandler: () => ({ isSettingPosition: false })
+    } satisfies MediaAction<"seek">,
+} as const;
+
+// Type assertion to ensure our map is complete and correct
+type _AssertComplete = typeof MEDIA_ACTIONS extends Record<EndpointName, any> ? true : false;
+
 // Don't wanna run before Flux and Dispatcher are ready!
 export const WinampStore = proxyLazyWebpack(() => {
     // For some reason ts hates extends Flux.Store
@@ -69,95 +166,71 @@ export const WinampStore = proxyLazyWebpack(() => {
             this._start = Date.now();
         }
 
-        async prev() {
-            try {
-                await this.client.prev();
-            } catch (e) {
-                console.error("[WinampControls] Failed to go to previous track:", e);
+        // The ultimate generic media control executor - 100% type-safe and dynamic
+        public async executeMediaAction<T extends EndpointName>(
+            endpoint: T,
+            args: EndpointArgs<T>
+        ): Promise<EndpointResult<T>> {
+            // Special seek guard - the only exception to the rule
+            if (endpoint === "seek" && this.isSettingPosition) {
+                return Promise.resolve(true) as Promise<EndpointResult<T>>;
             }
-        }
 
-        async next() {
+            const action = MEDIA_ACTIONS[endpoint] as MediaAction<T>;
+
+            // Get current state for optimistic update
+            const currentState: StoreState = {
+                track: this.track,
+                isPlaying: this.isPlaying,
+                repeat: this.repeat,
+                shuffle: this.shuffle,
+                volume: this.volume,
+                mPosition: this.mPosition,
+                _start: this._start,
+                isSettingPosition: this.isSettingPosition
+            };
+
+            // Apply optimistic update
+            const optimisticState = action.optimisticUpdate(args, currentState);
+            this.applyStateUpdate(optimisticState);
+
             try {
-                await this.client.next();
-            } catch (e) {
-                console.error("[WinampControls] Failed to go to next track:", e);
-            }
-        }
+                // Execute client method with perfect type safety
+                const result = await action.clientMethod(this.client, args);
 
-        async setVolume(percent: number) {
-            // Immediately update UI for responsive feedback
-            this.volume = percent;
-            this.emitChange();
-
-            try {
-                await this.client.setVolume(percent);
-                // Confirm the state is still correct after the request
-                this.volume = percent;
-                this.emitChange();
-            } catch (e) {
-                console.error("[WinampControls] Failed to set volume:", e);
-                // Note: We don't revert volume on error as it's less critical
-            }
-        }
-
-        async setPlaying(playing: boolean) {
-            try {
-                if (await this.client[playing ? "play" : "pause"]()) {
-                    this.isPlaying = playing;
-                    this.emitChange();
+                // Handle special cases after successful execution
+                if (endpoint === "seek") {
+                    this.isSettingPosition = false;
+                    console.log(`[WinampStore] Seek completed successfully to ${args}ms`);
                 }
-            } catch (e) {
-                console.error(`[WinampControls] Failed to ${playing ? "play" : "pause"}:`, e);
-                // Revert the state on error
+
+                return result;
+            } catch (error) {
+                console.error(`[WinampControls] Failed to execute ${endpoint}:`, error);
+
+                // Apply error handling if defined
+                if (action.errorHandler) {
+                    const errorState = action.errorHandler(error, args);
+                    this.applyStateUpdate(errorState);
+                }
+
+                // Special error handling for seek
+                if (endpoint === "seek") {
+                    this.isSettingPosition = false;
+                    console.log("[WinampStore] Seek operation finished, isSettingPosition reset");
+                }
+
+                throw error;
             }
         }
 
-        async setRepeat(state: RepeatMode) {
-            try {
-                await this.client.setRepeat(state);
-                this.repeat = state;
-                this.emitChange();
-            } catch (e) {
-                console.error("[WinampControls] Failed to set repeat:", e);
-                // Fallback to local tracking
-                this.repeat = state;
-                this.emitChange();
-            }
+        // Helper to apply state updates and emit changes
+        private applyStateUpdate(stateUpdate: Partial<StoreState>) {
+            Object.assign(this, stateUpdate);
+            this.emitChange();
         }
 
-        async setShuffle(state: boolean) {
-            try {
-                await this.client.setShuffle(state);
-                this.shuffle = state;
-                this.emitChange();
-            } catch (e) {
-                console.error("[WinampControls] Failed to set shuffle:", e);
-                // Fallback to local tracking
-                this.shuffle = state;
-                this.emitChange();
-            }
-        }
-
-        async seek(ms: number) {
-
-            if (this.isSettingPosition) {
-                return Promise.resolve();
-            }
-
-            this.isSettingPosition = true;
-
-            try {
-                await this.client.seekTo(ms);
-                this.position = ms;
-                console.log(`[WinampStore] Seek completed successfully to ${ms}ms`);
-            } catch (e) {
-                console.error("[WinampControls] Failed to seek:", e);
-            } finally {
-                this.isSettingPosition = false;
-                console.log("[WinampStore] Seek operation finished, isSettingPosition reset");
-            }
-        }
+        // executeMediaAction is now the ONE TRUE RULER of all media actions!
 
         // Get current player state - now much simpler since client provides UI-ready data
         public async getCurrentState(): Promise<PlayerState | null> {

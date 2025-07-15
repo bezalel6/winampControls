@@ -33,7 +33,7 @@ export function Volume({ volume }: { volume: number; }) {
                     minValue={0}
                     maxValue={100}
                     initialValue={volume}
-                    onValueChange={(v: number) => WinampStore.setVolume(v)}
+                    onValueChange={(v: number) => WinampStore.executeMediaAction("setVolume", v)}
                     onValueRender={(v: number) => `${Math.round(v)}%`}
                     hideBubble={false}
                 />
