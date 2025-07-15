@@ -19,101 +19,47 @@
 import { proxyLazyWebpack } from "@webpack";
 import { Flux, FluxDispatcher } from "@webpack/common";
 
+import { OptimisticMediaController, type StoreState, type WinampMediaAction } from "./OptimisticMediaController";
 import { ConsecutiveFailuresError, type HTTPQConfig, type PlayerState, type RepeatMode, type Track, vencordFetch, WinampClient } from "./WinampClient";
 
-// Advanced TypeScript magic for media control endpoints
-type MediaEndpoints = {
-    prev: { args: void; result: boolean; };
-    next: { args: void; result: boolean; };
-    setVolume: { args: number; result: boolean; };
-    setPlaying: { args: boolean; result: boolean; };
-    setRepeat: { args: RepeatMode; result: boolean; };
-    setShuffle: { args: boolean; result: boolean; };
-    seek: { args: number; result: boolean; };
-};
-
-// Extract endpoint names as union type
-type EndpointName = keyof MediaEndpoints;
-
-// Generic type for extracting args from endpoint
-type EndpointArgs<T extends EndpointName> = MediaEndpoints[T]["args"];
-
-// Generic type for extracting result from endpoint
-type EndpointResult<T extends EndpointName> = MediaEndpoints[T]["result"];
-
-// Store state type for optimistic updates
-type StoreState = {
-    track: Track | null;
-    isPlaying: boolean;
-    repeat: RepeatMode;
-    shuffle: boolean;
-    volume: number;
-    mPosition: number;
-    _start: number;
-};
-
-// State update function type
-type StateUpdateFn<T extends EndpointName> = (
-    args: EndpointArgs<T>,
-    currentState: StoreState
-) => Partial<StoreState>;
-
-// Client method type
-type ClientMethod<T extends EndpointName> = (
-    client: WinampClient,
-    args: EndpointArgs<T>
-) => Promise<EndpointResult<T>>;
-
-// Media action definition
-type MediaAction<T extends EndpointName> = {
-    clientMethod: ClientMethod<T>;
-    optimisticUpdate: StateUpdateFn<T>;
-    errorHandler?: (error: unknown, args: EndpointArgs<T>) => Partial<StoreState>;
-};
-
-// The sacred map of all media actions - completely type-safe and generic
-const MEDIA_ACTIONS = {
+// Winamp-specific media action registry
+const WINAMP_MEDIA_ACTIONS: Record<string, WinampMediaAction> = {
     prev: {
         clientMethod: (client: WinampClient) => client.prev(),
         optimisticUpdate: () => ({}), // No immediate state change needed
-    } satisfies MediaAction<"prev">,
+    },
     next: {
         clientMethod: (client: WinampClient) => client.next(),
         optimisticUpdate: () => ({}), // No immediate state change needed
-    } satisfies MediaAction<"next">,
+    },
     setVolume: {
         clientMethod: (client: WinampClient, volume: number) => client.setVolume(volume),
         optimisticUpdate: (volume: number) => ({ volume }),
-    } satisfies MediaAction<"setVolume">,
+    },
     setPlaying: {
         clientMethod: (client: WinampClient, playing: boolean) => client[playing ? "play" : "pause"](),
-        optimisticUpdate: (playing: boolean, state: StoreState) => ({
-            isPlaying: playing,
-            _start: playing ? Date.now() : state._start
+        optimisticUpdate: (playing: boolean) => ({
+            isPlaying: playing
         }),
         errorHandler: (error: unknown, playing: boolean) => ({
             isPlaying: !playing // Revert on error
         })
-    } satisfies MediaAction<"setPlaying">,
+    },
     setRepeat: {
         clientMethod: (client: WinampClient, state: RepeatMode) => client.setRepeat(state),
         optimisticUpdate: (state: RepeatMode) => ({ repeat: state }),
-    } satisfies MediaAction<"setRepeat">,
+    },
     setShuffle: {
         clientMethod: (client: WinampClient, state: boolean) => client.setShuffle(state),
         optimisticUpdate: (state: boolean) => ({ shuffle: state }),
-    } satisfies MediaAction<"setShuffle">,
+    },
     seek: {
         clientMethod: (client: WinampClient, ms: number) => client.seekTo(ms),
         optimisticUpdate: (ms: number) => ({
-            mPosition: ms,
-            _start: Date.now()
+            position: ms
         }),
-    } satisfies MediaAction<"seek">,
+    },
 } as const;
-
-// Type assertion to ensure our map is complete and correct
-type _AssertComplete = typeof MEDIA_ACTIONS extends Record<EndpointName, any> ? true : false;
 
 // Don't wanna run before Flux and Dispatcher are ready!
 export const WinampStore = proxyLazyWebpack(() => {
@@ -121,28 +67,16 @@ export const WinampStore = proxyLazyWebpack(() => {
     const { Store } = Flux;
 
     class WinampStore extends Store {
-        public mPosition = 0;
-        public _start = 0;
-
         // Store state now matches the UI-friendly types from winampClient
         public track: Track | null = null;
         public isPlaying = false;
         public repeat: RepeatMode = "off";
         public shuffle = false;
         public volume = 0;
-
+        public position = 0;
 
         public isPollingEnabled = true; // Track if polling should be active
         public lastConsecutiveFailure: ConsecutiveFailuresError | null = null;
-
-        // Advanced timestamp-based state conflict resolution system
-        // Prevents polling from overwriting recent optimistic updates
-        // Each optimistic update records its timestamp; polling only updates keys
-        // that haven't been optimistically updated after the poll was initiated
-        private optimisticUpdateTimestamps = new Map<keyof StoreState, number>();
-
-        // Track expected values for optimistic updates to confirm server state
-        private optimisticExpectedValues = new Map<keyof StoreState, any>();
 
         private config: HTTPQConfig = {
             host: "127.0.0.1",
@@ -153,233 +87,59 @@ export const WinampStore = proxyLazyWebpack(() => {
         private client: WinampClient;
         private pollingInterval: number | null = null;
 
+        // The optimistic media controller - handles all optimistic updates
+        private optimisticController: OptimisticMediaController;
+
         constructor(dispatcher: any, actionHandlers: any) {
             super(dispatcher, actionHandlers);
             this.client = new WinampClient(vencordFetch, this.config);
+
+            // Initialize optimistic controller
+            this.optimisticController = new OptimisticMediaController(
+                this.client,
+                WINAMP_MEDIA_ACTIONS,
+                (update, isOptimistic) => this.applyStateUpdate(update, isOptimistic),
+                () => this.getCurrentStoreState()
+            );
         }
 
-        // Need to keep track of this manually
-        public get position(): number {
-            let pos = this.mPosition;
-            if (this.isPlaying) {
-                pos += Date.now() - this._start;
-            }
-            return pos;
-        }
-
-        public set position(p: number) {
-            this.mPosition = p;
-            this._start = Date.now();
-        }
-
-        // The ultimate generic media control executor - 100% type-safe and dynamic
-        public async executeMediaAction<T extends EndpointName>(
-            endpoint: T,
-            args: EndpointArgs<T>
-        ): Promise<EndpointResult<T>> {
-            const action = MEDIA_ACTIONS[endpoint] as MediaAction<T>;
-
-            // Get current state for optimistic update
-            const currentState: StoreState = {
+        // Get current store state for optimistic controller
+        private getCurrentStoreState(): StoreState {
+            return {
                 track: this.track,
                 isPlaying: this.isPlaying,
                 repeat: this.repeat,
                 shuffle: this.shuffle,
                 volume: this.volume,
-                mPosition: this.mPosition,
-                _start: this._start
+                position: this.position
             };
+        }
 
-            // Apply optimistic update with timestamp tracking
-            const optimisticState = action.optimisticUpdate(args, currentState);
-            this.applyStateUpdate(optimisticState, true);
-
-            try {
-                // Execute client method with perfect type safety
-                const result = await action.clientMethod(this.client, args);
-
-                console.log(`[WinampStore] ${endpoint} completed successfully - polling will confirm state changes`);
-
-                return result;
-            } catch (error) {
-                console.error(`[WinampControls] Failed to execute ${endpoint}:`, error);
-
-                // Apply error handling if defined
-                if (action.errorHandler) {
-                    const errorState = action.errorHandler(error, args);
-                    this.applyStateUpdate(errorState);
-                }
-
-                throw error;
-            }
+        // Execute media action - now delegates to optimistic controller
+        public async executeMediaAction(endpoint: string, args: any): Promise<any> {
+            return this.optimisticController.executeMediaAction(endpoint, args);
         }
 
         // Helper to apply state updates and emit changes
         private applyStateUpdate(stateUpdate: Partial<StoreState>, isOptimistic = false) {
-            // Track isPlaying changes with stack trace
-            if ("isPlaying" in stateUpdate && stateUpdate.isPlaying !== this.isPlaying) {
-                const oldValue = this.isPlaying;
-                const newValue = stateUpdate.isPlaying;
-                console.log(`[WinampStore] isPlaying changed: ${oldValue} → ${newValue} (${isOptimistic ? "optimistic" : "normal"})`);
-                console.trace("[WinampStore] isPlaying change stack trace:");
-            }
-
-            // Record timestamps and expected values for optimistic updates
-            if (isOptimistic) {
-                const timestamp = Date.now();
-                Object.entries(stateUpdate).forEach(([key, value]) => {
-                    const stateKey = key as keyof StoreState;
-                    this.optimisticUpdateTimestamps.set(stateKey, timestamp);
-                    this.optimisticExpectedValues.set(stateKey, value);
-                });
-            }
-
             Object.assign(this, stateUpdate);
             this.emitChange();
         }
 
-        // Get filtered polling update without applying it (for Flux dispatch)
-        private getFilteredPollingUpdate(pollingState: Partial<StoreState>, pollInitiatedAt: number): Partial<StoreState> {
-            const filteredUpdate: Partial<StoreState> = {};
-
-            Object.entries(pollingState).forEach(([key, value]) => {
-                const stateKey = key as keyof StoreState;
-                const optimisticTimestamp = this.optimisticUpdateTimestamps.get(stateKey);
-                const expectedValue = this.optimisticExpectedValues.get(stateKey);
-
-                if (!optimisticTimestamp || optimisticTimestamp < pollInitiatedAt) {
-                    // No optimistic update or optimistic update is older than poll - safe to update
-                    (filteredUpdate as any)[key] = value;
-                } else {
-                    // Check if polling confirms our optimistic update
-                    if (expectedValue !== undefined && this.valuesMatch(value, expectedValue)) {
-                        // Server confirmed our optimistic update - allow update
-                        (filteredUpdate as any)[key] = value;
-                    }
-                    // If not confirmed, skip this key (no entry in filteredUpdate)
-                }
-            });
-
-            return filteredUpdate;
-        }
-
-        // Apply polling updates with timestamp-based conflict resolution
+        // Apply polling updates with optimistic controller's conflict resolution
         private applyPollingUpdate(pollingState: Partial<StoreState>, pollInitiatedAt: number) {
-            const filteredUpdate: Partial<StoreState> = {};
-            const confirmedKeys: string[] = [];
-
-            Object.entries(pollingState).forEach(([key, value]) => {
-                const stateKey = key as keyof StoreState;
-                const optimisticTimestamp = this.optimisticUpdateTimestamps.get(stateKey);
-                const expectedValue = this.optimisticExpectedValues.get(stateKey);
-
-                if (!optimisticTimestamp || optimisticTimestamp < pollInitiatedAt) {
-                    // No optimistic update or optimistic update is older than poll - safe to update
-                    if (optimisticTimestamp) {
-                        // Remove expired timestamp and expected value
-                        this.optimisticUpdateTimestamps.delete(stateKey);
-                        this.optimisticExpectedValues.delete(stateKey);
-                    }
-                    (filteredUpdate as any)[key] = value;
-                } else {
-                    // Check if polling confirms our optimistic update
-                    if (expectedValue !== undefined && this.valuesMatch(value, expectedValue)) {
-                        // Server confirmed our optimistic update - clear timestamps and allow update
-                        this.optimisticUpdateTimestamps.delete(stateKey);
-                        this.optimisticExpectedValues.delete(stateKey);
-                        (filteredUpdate as any)[key] = value;
-                        confirmedKeys.push(key);
-                        console.log(`[WinampStore] Server confirmed optimistic update for '${key}': ${JSON.stringify(value)}`);
-                    } else {
-                        // Optimistic update is newer than poll and not confirmed - skip this key
-                        console.log(`[WinampStore] Skipping polling update for '${key}' due to recent optimistic update (expected: ${JSON.stringify(expectedValue)}, got: ${JSON.stringify(value)})`);
-                    }
-                }
-            });
-
-            if (confirmedKeys.length > 0) {
-                console.log("[WinampStore] Confirmed optimistic updates for keys:", confirmedKeys);
-            }
+            const filteredUpdate = this.optimisticController.applyPollingUpdate(pollingState, pollInitiatedAt);
 
             if (Object.keys(filteredUpdate).length > 0) {
-                // Track isPlaying changes with stack trace for polling updates
-                if ("isPlaying" in filteredUpdate && filteredUpdate.isPlaying !== this.isPlaying) {
-                    const oldValue = this.isPlaying;
-                    const newValue = filteredUpdate.isPlaying;
-                    console.log(`[WinampStore] isPlaying changed via polling: ${oldValue} → ${newValue}`);
-                    console.trace("[WinampStore] isPlaying polling change stack trace:");
-                }
-
                 Object.assign(this, filteredUpdate);
                 this.emitChange();
             }
         }
 
-        // Utility methods for timestamp-based conflict resolution
-
-        // Compare values for optimistic update confirmation
-        private valuesMatch(a: any, b: any): boolean {
-            // Handle null/undefined
-            if (a === null && b === null) return true;
-            if (a === undefined && b === undefined) return true;
-            if (a === null || b === null || a === undefined || b === undefined) return false;
-
-            // Handle primitives
-            if (typeof a !== "object" || typeof b !== "object") {
-                return a === b;
-            }
-
-            // Handle objects/arrays (deep comparison would be overkill for our use case)
-            return JSON.stringify(a) === JSON.stringify(b);
-        }
-
-        // Clear expired optimistic timestamps (older than specified age in ms)
-        private clearExpiredOptimisticTimestamps(maxAge = 5000) {
-            const now = Date.now();
-            const expiredKeys: (keyof StoreState)[] = [];
-
-            this.optimisticUpdateTimestamps.forEach((timestamp, key) => {
-                if (now - timestamp > maxAge) {
-                    expiredKeys.push(key);
-                }
-            });
-
-            expiredKeys.forEach(key => {
-                this.optimisticUpdateTimestamps.delete(key);
-                this.optimisticExpectedValues.delete(key);
-            });
-
-            if (expiredKeys.length > 0) {
-                console.log(`[WinampStore] Cleared ${expiredKeys.length} expired optimistic timestamps:`, expiredKeys);
-            }
-        }
-
-        // Get current optimistic update state (for debugging)
-        public getOptimisticUpdateState(): Record<string, { timestamp: number; age: number; expectedValue: any; }> {
-            const now = Date.now();
-            const result: Record<string, { timestamp: number; age: number; expectedValue: any; }> = {};
-
-            this.optimisticUpdateTimestamps.forEach((timestamp, key) => {
-                result[key] = {
-                    timestamp,
-                    age: now - timestamp,
-                    expectedValue: this.optimisticExpectedValues.get(key)
-                };
-            });
-
-            return result;
-        }
-
-        // executeMediaAction is now the ONE TRUE RULER of all media actions!
-
         // Get current player state - now much simpler since client provides UI-ready data
         public async getCurrentState(): Promise<PlayerState | null> {
             try {
-                const state = await this.client.getPlayerState();
-
-                // Position syncing is now handled by timestamp-based conflict resolution
-
-                return state;
+                return await this.client.getPlayerState();
             } catch (error) {
                 console.error("[WinampControls] Failed to get current state:", error);
                 return null;
@@ -414,7 +174,7 @@ export const WinampStore = proxyLazyWebpack(() => {
                 const pollInitiatedAt = Date.now();
 
                 // Clean up expired optimistic timestamps
-                this.clearExpiredOptimisticTimestamps();
+                this.optimisticController.clearExpiredOptimisticTimestamps();
 
                 try {
                     const state = await this.getCurrentState();
@@ -426,12 +186,11 @@ export const WinampStore = proxyLazyWebpack(() => {
                             isPlaying: state.isPlaying,
                             repeat: state.repeat,
                             shuffle: state.shuffle,
-                            mPosition: state.position,
-                            _start: this.isPlaying ? Date.now() - state.position : this._start
+                            position: state.position
                         };
 
                         // Get the filtered update that respects optimistic timestamps
-                        const filteredFluxUpdate = this.getFilteredPollingUpdate(pollingState, pollInitiatedAt);
+                        const filteredFluxUpdate = this.optimisticController.getFilteredPollingUpdate(pollingState, pollInitiatedAt);
 
                         // Apply the filtered update to the store
                         this.applyPollingUpdate(pollingState, pollInitiatedAt);
@@ -444,7 +203,7 @@ export const WinampStore = proxyLazyWebpack(() => {
                             isPlaying: filteredFluxUpdate.isPlaying ?? this.isPlaying,
                             repeat: filteredFluxUpdate.repeat ?? this.repeat,
                             shuffle: filteredFluxUpdate.shuffle ?? this.shuffle,
-                            position: filteredFluxUpdate.mPosition ?? this.position,
+                            position: filteredFluxUpdate.position ?? this.position,
                             isConnected: state.isConnected
                         });
                     }
@@ -461,12 +220,11 @@ export const WinampStore = proxyLazyWebpack(() => {
                             isPlaying: false,
                             repeat: "off" as RepeatMode,
                             shuffle: false,
-                            mPosition: 0,
-                            _start: Date.now()
+                            position: 0
                         };
 
                         const disconnectedPollTime = Date.now();
-                        const filteredDisconnectedUpdate = this.getFilteredPollingUpdate(disconnectedState, disconnectedPollTime);
+                        const filteredDisconnectedUpdate = this.optimisticController.getFilteredPollingUpdate(disconnectedState, disconnectedPollTime);
 
                         this.applyPollingUpdate(disconnectedState, disconnectedPollTime);
 
@@ -478,7 +236,7 @@ export const WinampStore = proxyLazyWebpack(() => {
                             isPlaying: filteredDisconnectedUpdate.isPlaying ?? this.isPlaying,
                             repeat: filteredDisconnectedUpdate.repeat ?? this.repeat,
                             shuffle: filteredDisconnectedUpdate.shuffle ?? this.shuffle,
-                            position: filteredDisconnectedUpdate.mPosition ?? this.position,
+                            position: filteredDisconnectedUpdate.position ?? this.position,
                             isConnected: false
                         });
                     } else {
@@ -533,12 +291,25 @@ export const WinampStore = proxyLazyWebpack(() => {
             };
         }
 
+        // Get current optimistic update state (for debugging) - delegates to controller
+        public getOptimisticUpdateState(): Record<string, { timestamp: number; age: number; expectedValue: any; }> {
+            return this.optimisticController.getOptimisticUpdateState();
+        }
+
         // Configure httpQ connection
         public configure(config: Partial<HTTPQConfig>) {
             this.config = { ...this.config, ...config };
 
             // Recreate the client with new configuration
             this.client = new WinampClient(vencordFetch, this.config);
+
+            // Recreate optimistic controller with new client
+            this.optimisticController = new OptimisticMediaController(
+                this.client,
+                WINAMP_MEDIA_ACTIONS,
+                (update, isOptimistic) => this.applyStateUpdate(update, isOptimistic),
+                () => this.getCurrentStoreState()
+            );
 
             // Reset polling state when configuration changes
             this.isPollingEnabled = true;
@@ -591,16 +362,8 @@ export const WinampStore = proxyLazyWebpack(() => {
 
     const store = new WinampStore(FluxDispatcher, {
         WINAMP_PLAYER_STATE(e: { track: Track | null; volume: number; isPlaying: boolean; repeat: RepeatMode; shuffle: boolean; position: number; isConnected: boolean; }) {
-            // Track isPlaying changes with stack trace for Flux updates
-            const oldIsPlaying = store.isPlaying;
-            const newIsPlaying = e.isPlaying ?? false;
-            if (oldIsPlaying !== newIsPlaying) {
-                console.log(`[WinampStore] isPlaying changed via Flux: ${oldIsPlaying} → ${newIsPlaying}`);
-                console.trace("[WinampStore] isPlaying Flux change stack trace:");
-            }
-
             store.track = e.track;
-            store.isPlaying = newIsPlaying;
+            store.isPlaying = e.isPlaying ?? false;
             store.volume = e.volume ?? 0;
             store.repeat = e.repeat || "off";
             store.shuffle = e.shuffle ?? false;
@@ -616,4 +379,5 @@ export const WinampStore = proxyLazyWebpack(() => {
 });
 
 // Re-export types for convenience
+export type { StoreState } from "./OptimisticMediaController";
 export type { ConsecutiveFailuresError, HTTPQConfig, PlayerState, RepeatMode, Track } from "./WinampClient";
