@@ -216,7 +216,7 @@
     display: flex;
     margin: auto auto;
     margin-top: var(--vc-winamp-spacing-sm);
-    /* width: 100%; */
+    align-items: center;
     justify-content: space-between;
     transition: 0.2s width;
 }
