@@ -22,7 +22,7 @@ import ErrorBoundary from "@components/ErrorBoundary";
 import { Flex } from "@components/Flex";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
-import { Button, Forms, React, TextInput } from "@webpack/common";
+import { Button, Forms, React, Switch, TextInput } from "@webpack/common";
 
 import hoverOnlyStyle from "./hoverOnly.css?managed";
 import { Player } from "./PlayerComponent";
@@ -38,6 +38,66 @@ function updateHttpQConfig() {
         port: settings.store.httpqPort,
         password: settings.store.httpqPassword
     });
+}
+
+function UICustomizationSettings() {
+    const { hoverControls, previousButtonRestartsTrack, showSeeker } = settings.use(["hoverControls", "previousButtonRestartsTrack", "showSeeker"]);
+
+    function handleHoverControlsChange(value: boolean) {
+        settings.store.hoverControls = value;
+        toggleHoverControls(value);
+    }
+
+    function handlePreviousButtonRestartsTrackChange(value: boolean) {
+        settings.store.previousButtonRestartsTrack = value;
+    }
+
+    function handleShowSeekerChange(value: boolean) {
+        settings.store.showSeeker = value;
+    }
+
+    return (
+        <div style={{
+            padding: 16,
+            backgroundColor: "var(--background-secondary-alt)",
+            borderRadius: 8,
+            marginBottom: 16
+        }}>
+            <Forms.FormSection>
+                <Forms.FormTitle tag="h3" style={{ marginBottom: 12, fontSize: 16 }}>UI Customization</Forms.FormTitle>
+
+                <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                    gap: 16
+                }}>
+                    <Switch
+                        value={hoverControls}
+                        onChange={handleHoverControlsChange}
+                        note="Show controls only when hovering"
+                    >
+                        Hover controls
+                    </Switch>
+
+                    <Switch
+                        value={previousButtonRestartsTrack}
+                        onChange={handlePreviousButtonRestartsTrackChange}
+                        note="Restart track if >3s elapsed"
+                    >
+                        Previous restarts track
+                    </Switch>
+
+                    <Switch
+                        value={showSeeker}
+                        onChange={handleShowSeekerChange}
+                        note="Display seek bar in controls"
+                    >
+                        Show seeker
+                    </Switch>
+                </div>
+            </Forms.FormSection>
+        </div>
+    );
 }
 
 function HttpQServerSettings() {
@@ -109,71 +169,90 @@ function HttpQServerSettings() {
     }
 
     return (
-        <Forms.FormSection>
-            <Forms.FormTitle tag="h3">HttpQ Server Configuration</Forms.FormTitle>
-            <Forms.FormText type="description" style={{ marginBottom: 12 }}>
-                Configure connection settings for Winamp's HttpQ plugin
-            </Forms.FormText>
+        <div style={{
+            padding: 16,
+            backgroundColor: "var(--background-secondary-alt)",
+            borderRadius: 8,
+            marginBottom: 16
+        }}>
+            <Forms.FormSection>
+                <Forms.FormTitle tag="h3" style={{ marginBottom: 8, fontSize: 16 }}>HttpQ Server Configuration</Forms.FormTitle>
+                <Forms.FormText type="description" style={{ marginBottom: 8, fontSize: 13 }}>
+                    Configure connection settings for Winamp's HttpQ plugin
+                </Forms.FormText>
 
-            <Forms.FormText type="warning" style={{ marginBottom: 12 }}>
-                ⚠️ You will need to restart Vencord for configuration changes to take effect
-            </Forms.FormText>
+                <Forms.FormText type="warning" style={{ marginBottom: 12, fontSize: 13 }}>
+                    ⚠️ You will need to restart Vencord for configuration changes to take effect
+                </Forms.FormText>
 
-            <Flex flexDirection="row" style={{ gap: 12, alignItems: "flex-end" }}>
-                <div style={{ flex: 2 }}>
-                    <Forms.FormTitle tag="h5">Host</Forms.FormTitle>
-                    <TextInput
-                        value={httpqHost}
-                        onChange={handleHostChange}
-                        placeholder="127.0.0.1"
-                    />
-                </div>
-                <div style={{ flex: 1 }}>
-                    <Forms.FormTitle tag="h5">Port</Forms.FormTitle>
-                    <TextInput
-                        type="number"
-                        value={httpqPort}
-                        onChange={handlePortChange}
-                        placeholder="4800"
-                        error={portError ? "Invalid port number" : undefined}
-                    />
-                </div>
-                <div style={{ flex: 1.5 }}>
-                    <Forms.FormTitle tag="h5">Password</Forms.FormTitle>
-                    <TextInput
-                        value={httpqPassword}
-                        onChange={handlePasswordChange}
-                        placeholder="pass"
-                    />
-                </div>
-                <div style={{ flex: 1 }}>
-                    <Button
-                        onClick={testConnection}
-                        submitting={buttonState === "loading"}
-                        disabled={buttonState === "loading" || portError}
-                        size={Button.Sizes.SMALL}
-                        color={getButtonColor()}
-                        style={{ width: "100%" }}
-                    >
-                        {getButtonText()}
-                    </Button>
-                </div>
-            </Flex>
-        </Forms.FormSection>
+                <Flex flexDirection="row" style={{ gap: 12, alignItems: "flex-end" }}>
+                    <div style={{ flex: 2 }}>
+                        <Forms.FormTitle tag="h5" style={{ fontSize: 14, marginBottom: 4 }}>Host</Forms.FormTitle>
+                        <TextInput
+                            value={httpqHost}
+                            onChange={handleHostChange}
+                            placeholder="127.0.0.1"
+                        />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <Forms.FormTitle tag="h5" style={{ fontSize: 14, marginBottom: 4 }}>Port</Forms.FormTitle>
+                        <TextInput
+                            type="number"
+                            value={httpqPort}
+                            onChange={handlePortChange}
+                            placeholder="4800"
+                            error={portError ? "Invalid port number" : undefined}
+                        />
+                    </div>
+                    <div style={{ flex: 1.5 }}>
+                        <Forms.FormTitle tag="h5" style={{ fontSize: 14, marginBottom: 4 }}>Password</Forms.FormTitle>
+                        <TextInput
+                            value={httpqPassword}
+                            onChange={handlePasswordChange}
+                            placeholder="pass"
+                        />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <Button
+                            onClick={testConnection}
+                            submitting={buttonState === "loading"}
+                            disabled={buttonState === "loading" || portError}
+                            size={Button.Sizes.SMALL}
+                            color={getButtonColor()}
+                            style={{ width: "100%" }}
+                        >
+                            {getButtonText()}
+                        </Button>
+                    </div>
+                </Flex>
+            </Forms.FormSection>
+        </div>
     );
 }
 
 export const settings = definePluginSettings({
+    uiCustomizations: {
+        type: OptionType.COMPONENT,
+        component: UICustomizationSettings
+    },
     hoverControls: {
         description: "Show controls on hover",
         type: OptionType.BOOLEAN,
         default: false,
-        onChange: v => toggleHoverControls(v)
+        onChange: v => toggleHoverControls(v),
+        hidden: true
     },
     previousButtonRestartsTrack: {
         type: OptionType.BOOLEAN,
         description: "Restart currently playing track when pressing the previous button if playtime is >3s",
-        default: true
+        default: true,
+        hidden: true
+    },
+    showSeeker: {
+        type: OptionType.BOOLEAN,
+        description: "Show seeker bar in player controls",
+        default: true,
+        hidden: true
     },
     httpqSettings: {
         type: OptionType.COMPONENT,

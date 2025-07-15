@@ -19,8 +19,9 @@
 import "../winampStyles.css";
 
 import { classNameFactory } from "@api/Styles";
-import { useEffect, useState, useStateFromStores } from "@webpack/common";
+import { ContextMenuApi, FluxDispatcher, Menu, React, useEffect, useState, useStateFromStores } from "@webpack/common";
 
+import { settings } from "..";
 import { WinampStore } from "../WinampStore";
 import { Controls } from "./Controls";
 import { ProgressBar } from "./ProgressBar";
@@ -28,6 +29,31 @@ import { TrackInfo } from "./TrackInfo";
 import { Volume } from "./Volume";
 
 const cl = classNameFactory("vc-winamp-");
+
+function WinampContextMenu() {
+    return (
+        <Menu.Menu
+            navId="winamp-context-menu"
+            onClose={() => FluxDispatcher.dispatch({ type: "CONTEXT_MENU_CLOSE" })}
+            aria-label="Winamp Player Menu"
+        >
+            <Menu.MenuControlItem
+                id="winamp-progress"
+                key="winamp-progress"
+                label="Progress"
+                control={(props, ref) => (
+                    <ProgressBar {...props}
+                        disableHoverEffects ref={ref} />
+                )}
+            />
+        </Menu.Menu>
+    );
+}
+
+function makeContextMenu() {
+    return (e: React.MouseEvent<HTMLElement, MouseEvent>) =>
+        ContextMenuApi.openContextMenu(e, () => <WinampContextMenu />);
+}
 
 export function Player() {
     const [track, volume, isPlaying] = useStateFromStores(
@@ -46,11 +72,11 @@ export function Player() {
     if (shouldHide || !track) return null;
 
     return (
-        <div id={cl("player")}>
+        <div id={cl("player")} onContextMenu={makeContextMenu()}>
             <TrackInfo track={track} />
             <Volume volume={volume} />
             <Controls />
-            <ProgressBar />
+            {settings.store.showSeeker && < ProgressBar />}
         </div>
     );
 }

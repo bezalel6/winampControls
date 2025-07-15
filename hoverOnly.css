@@ -49,7 +49,7 @@
 }
 
 /* Stage 2: Seekbar (starts immediately, duration auto-calculated) */
-#vc-winamp-progress-bar .vc-winamp-slider {
+#vc-winamp-progress-bar:not(.vc-winamp-no-hover) .vc-winamp-slider {
     max-height: 0;
     opacity: 0;
     pointer-events: none;
@@ -58,7 +58,7 @@
     transition-delay: var(--vc-winamp-stage2-delay);
 }
 
-#vc-winamp-player:hover #vc-winamp-progress-bar .vc-winamp-slider {
+#vc-winamp-player:hover #vc-winamp-progress-bar:not(.vc-winamp-no-hover) .vc-winamp-slider {
     opacity: 1;
     pointer-events: auto;
     max-height: 500px;
@@ -68,21 +68,21 @@
 }
 
 /* Stage 3: Progress Text & Divider (delay auto-calculated after seekbar) */
-#vc-winamp-progress-text {
+#vc-winamp-progress-bar:not(.vc-winamp-no-hover) #vc-winamp-progress-text {
     width: 50%;
     transition: var(--vc-winamp-progress-duration) var(--vc-winamp-ease-out);
     transition-property: width;
     transition-delay: 0s;
 }
 
-#vc-winamp-player:hover #vc-winamp-progress-text {
+#vc-winamp-player:hover #vc-winamp-progress-bar:not(.vc-winamp-no-hover) #vc-winamp-progress-text {
     width: 100%;
     transition: var(--vc-winamp-progress-duration) var(--vc-winamp-ease-in);
     transition-property: width;
     transition-delay: var(--vc-winamp-stage3-delay);
 }
 
-.vc-winamp-progress-divider {
+#vc-winamp-progress-bar:not(.vc-winamp-no-hover) .vc-winamp-progress-divider {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -93,7 +93,7 @@
     transition-delay: 0s;
 }
 
-#vc-winamp-player:hover .vc-winamp-progress-divider {
+#vc-winamp-player:hover #vc-winamp-progress-bar:not(.vc-winamp-no-hover) .vc-winamp-progress-divider {
     height: 0;
     transition: var(--vc-winamp-divider-duration) var(--vc-winamp-ease-in);
     transition-property: height;

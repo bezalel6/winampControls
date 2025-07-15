@@ -31,7 +31,11 @@ function msToHuman(ms: number) {
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-export function ProgressBar() {
+interface ProgressBarProps {
+    disableHoverEffects?: boolean;
+}
+
+export function ProgressBar({ disableHoverEffects = false }: ProgressBarProps = {}) {
     const [trackLength, position] = useStateFromStores(
         [WinampStore],
         () => [WinampStore.track?.duration, WinampStore.position]
@@ -76,7 +80,10 @@ export function ProgressBar() {
     if (!trackLength) return null;
 
     return (
-        <div id={cl("progress-bar")}>
+        <div
+            id={cl("progress-bar")}
+            className={disableHoverEffects ? cl("no-hover") : ""}
+        >
             <SeekBar
                 className={cl("slider")}
                 minValue={0}
