@@ -50,7 +50,6 @@ type StoreState = {
     volume: number;
     mPosition: number;
     _start: number;
-    isSettingPosition: boolean;
 };
 
 // State update function type
@@ -108,10 +107,8 @@ const MEDIA_ACTIONS = {
         clientMethod: (client: WinampClient, ms: number) => client.seekTo(ms),
         optimisticUpdate: (ms: number) => ({
             mPosition: ms,
-            _start: Date.now(),
-            isSettingPosition: true
+            _start: Date.now()
         }),
-        errorHandler: () => ({ isSettingPosition: false })
     } satisfies MediaAction<"seek">,
 } as const;
 
@@ -134,7 +131,7 @@ export const WinampStore = proxyLazyWebpack(() => {
         public shuffle = false;
         public volume = 0;
 
-        public isSettingPosition = false;
+
         public isPollingEnabled = true; // Track if polling should be active
         public lastConsecutiveFailure: ConsecutiveFailuresError | null = null;
 
@@ -180,11 +177,6 @@ export const WinampStore = proxyLazyWebpack(() => {
             endpoint: T,
             args: EndpointArgs<T>
         ): Promise<EndpointResult<T>> {
-            // Special seek guard - the only exception to the rule
-            if (endpoint === "seek" && this.isSettingPosition) {
-                return Promise.resolve(true) as Promise<EndpointResult<T>>;
-            }
-
             const action = MEDIA_ACTIONS[endpoint] as MediaAction<T>;
 
             // Get current state for optimistic update
@@ -195,8 +187,7 @@ export const WinampStore = proxyLazyWebpack(() => {
                 shuffle: this.shuffle,
                 volume: this.volume,
                 mPosition: this.mPosition,
-                _start: this._start,
-                isSettingPosition: this.isSettingPosition
+                _start: this._start
             };
 
             // Apply optimistic update with timestamp tracking
@@ -209,12 +200,6 @@ export const WinampStore = proxyLazyWebpack(() => {
 
                 console.log(`[WinampStore] ${endpoint} completed successfully - polling will confirm state changes`);
 
-                // Handle special cases after successful execution
-                if (endpoint === "seek") {
-                    this.isSettingPosition = false;
-                    console.log(`[WinampStore] Seek completed successfully to ${args}ms`);
-                }
-
                 return result;
             } catch (error) {
                 console.error(`[WinampControls] Failed to execute ${endpoint}:`, error);
@@ -223,12 +208,6 @@ export const WinampStore = proxyLazyWebpack(() => {
                 if (action.errorHandler) {
                     const errorState = action.errorHandler(error, args);
                     this.applyStateUpdate(errorState);
-                }
-
-                // Special error handling for seek
-                if (endpoint === "seek") {
-                    this.isSettingPosition = false;
-                    console.log("[WinampStore] Seek operation finished, isSettingPosition reset");
                 }
 
                 throw error;
@@ -398,10 +377,7 @@ export const WinampStore = proxyLazyWebpack(() => {
             try {
                 const state = await this.client.getPlayerState();
 
-                // Sync local position tracking with API position
-                if (state.track && !this.isSettingPosition) {
-                    this.position = state.position;
-                }
+                // Position syncing is now handled by timestamp-based conflict resolution
 
                 return state;
             } catch (error) {
@@ -451,8 +427,7 @@ export const WinampStore = proxyLazyWebpack(() => {
                             repeat: state.repeat,
                             shuffle: state.shuffle,
                             mPosition: state.position,
-                            _start: this.isPlaying ? Date.now() - state.position : this._start,
-                            isSettingPosition: false
+                            _start: this.isPlaying ? Date.now() - state.position : this._start
                         };
 
                         // Get the filtered update that respects optimistic timestamps
@@ -487,8 +462,7 @@ export const WinampStore = proxyLazyWebpack(() => {
                             repeat: "off" as RepeatMode,
                             shuffle: false,
                             mPosition: 0,
-                            _start: Date.now(),
-                            isSettingPosition: false
+                            _start: Date.now()
                         };
 
                         const disconnectedPollTime = Date.now();
@@ -631,7 +605,6 @@ export const WinampStore = proxyLazyWebpack(() => {
             store.repeat = e.repeat || "off";
             store.shuffle = e.shuffle ?? false;
             store.position = e.position ?? 0;
-            store.isSettingPosition = false;
             store.emitChange();
         }
     } as any);

@@ -33,9 +33,9 @@ function msToHuman(ms: number) {
 }
 
 export function ProgressBar() {
-    const [isSettingPosition, trackLength, position] = useStateFromStores(
+    const [trackLength, position] = useStateFromStores(
         [WinampStore],
-        () => [WinampStore.isSettingPosition, WinampStore.track?.duration, WinampStore.position]
+        () => [WinampStore.track?.duration, WinampStore.position]
     );
 
     const [statePosition, setStatePosition] = useState(position);
@@ -46,8 +46,6 @@ export function ProgressBar() {
         setStatePosition(position);
 
     const onChange = (v: number) => {
-        if (isSettingPosition) return;
-
         setStatePosition(v);
         setIsDragging(true);
 
