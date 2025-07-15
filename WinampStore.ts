@@ -144,15 +144,12 @@ export const WinampStore = proxyLazyWebpack(() => {
         }
 
         async seek(ms: number) {
-            console.log(`[WinampStore] Seek called with ${ms}ms, isSettingPosition: ${this.isSettingPosition}`);
 
             if (this.isSettingPosition) {
-                console.log("[WinampStore] Seek blocked - already setting position");
                 return Promise.resolve();
             }
 
             this.isSettingPosition = true;
-            console.log("[WinampStore] Starting seek operation");
 
             try {
                 await this.client.seekTo(ms);
