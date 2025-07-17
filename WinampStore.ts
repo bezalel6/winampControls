@@ -20,7 +20,7 @@ import { proxyLazyWebpack } from "@webpack";
 import { Flux, FluxDispatcher } from "@webpack/common";
 
 import { OptimisticMediaController, type StoreState, type WinampMediaAction } from "./OptimisticMediaController";
-import { ConsecutiveFailuresError, type HTTPQConfig, type PlayerState, type RepeatMode, type Track, vencordFetch, WinampClient } from "./WinampClient";
+import { ConsecutiveFailuresError, type HTTPQConfig, type PlayerState, type RepeatMode, type Track, WinampClient } from "./WinampClient";
 
 // Winamp-specific media action registry
 const WINAMP_MEDIA_ACTIONS: Record<string, WinampMediaAction> = {
@@ -92,7 +92,7 @@ export const WinampStore = proxyLazyWebpack(() => {
 
         constructor(dispatcher: any, actionHandlers: any) {
             super(dispatcher, actionHandlers);
-            this.client = new WinampClient(vencordFetch, this.config);
+            this.client = new WinampClient(this.config);
 
             // Initialize optimistic controller
             this.optimisticController = new OptimisticMediaController(
@@ -301,7 +301,7 @@ export const WinampStore = proxyLazyWebpack(() => {
             this.config = { ...this.config, ...config };
 
             // Recreate the client with new configuration
-            this.client = new WinampClient(vencordFetch, this.config);
+            this.client = new WinampClient(this.config);
 
             // Recreate optimistic controller with new client
             this.optimisticController = new OptimisticMediaController(
@@ -332,7 +332,7 @@ export const WinampStore = proxyLazyWebpack(() => {
         // Test httpQ connection with specific configuration
         public async testConfig(config: HTTPQConfig): Promise<boolean> {
             try {
-                return await WinampClient.testConfig(vencordFetch, config);
+                return await WinampClient.testConfig(config);
             } catch (error) {
                 console.error("[WinampControls] httpQ configuration test failed:", error);
                 return false;
@@ -352,7 +352,7 @@ export const WinampStore = proxyLazyWebpack(() => {
         // Static method to test connection with given config
         static async testConnection(config: HTTPQConfig): Promise<boolean> {
             try {
-                return await WinampClient.testConfig(vencordFetch, config);
+                return await WinampClient.testConfig(config);
             } catch (error) {
                 console.error("[WinampStore] Static connection test failed:", error);
                 return false;

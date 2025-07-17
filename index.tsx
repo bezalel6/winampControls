@@ -284,7 +284,30 @@ export default definePlugin({
     authors: [Devs.Ven, Devs.afn, Devs.KraXen72, Devs.Av32000, Devs.nin0dev, Devs.RNDev],
     settings,
     native: {
-        httpQRequest: "httpQRequest"
+        play: "play",
+        pause: "pause",
+        stop: "stop",
+        next: "next",
+        prev: "prev",
+        isPlaying: "isPlaying",
+        getOutputTime: "getOutputTime",
+        getVolume: "getVolume",
+        setVolume: "setVolume",
+        getListLength: "getListLength",
+        getListPos: "getListPos",
+        setPlaylistPos: "setPlaylistPos",
+        getPlaylistFile: "getPlaylistFile",
+        getPlaylistTitle: "getPlaylistTitle",
+        getPlaylistTitleList: "getPlaylistTitleList",
+        repeat: "repeat",
+        repeatStatus: "repeatStatus",
+        shuffle: "shuffle",
+        shuffleStatus: "shuffleStatus",
+        jumpToTime: "jumpToTime",
+        getCurrentTitle: "getCurrentTitle",
+        getId3Tag: "getId3Tag",
+        hasId3Tag: "hasId3Tag",
+        getVersion: "getVersion"
     },
     patches: [
         {

@@ -1,38 +1,102 @@
 /*
- * Vencord, a modification for Discord's desktop app
- * Copyright (c) 2022 Vendicated and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
-*/
+ * Vencord, a Discord client mod
+ * Copyright (c) 2025 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 
 import { IpcMainInvokeEvent } from "electron";
 
-// Simplified native fetch wrapper - just does HTTP requests
-export async function httpQRequest(_: IpcMainInvokeEvent, url: string): Promise<{ status: number; data: string; }> {
-    try {
-        const response = await fetch(url);
-        const data = await response.text();
+import type { EndpointName, EndpointParams, EndpointResponse } from "./types/endpoints";
 
+// Generic call function with localhost validation and endpoint lowercasing
+async function call<T extends EndpointName>(
+    _: IpcMainInvokeEvent,
+    base: string,
+    endpoint: T,
+    params: EndpointParams<T>
+): Promise<{ status: number; data: EndpointResponse<T>; }> {
+    if (!base.startsWith("localhost")) {
+        throw new Error("Invalid URL");
+    }
+
+    const lowercaseEndpoint = endpoint.toLowerCase();
+    const url = `http://${base}/${lowercaseEndpoint}`;
+    const urlParams = new URLSearchParams();
+
+    for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== null) {
+            urlParams.append(key, String(value));
+        }
+    }
+
+    const fullUrl = `${url}?${urlParams.toString()}`;
+
+    try {
+        const response = await fetch(fullUrl);
+        const data = await response.text();
         return {
             status: response.status,
-            data
+            data: data as EndpointResponse<T>
         };
     } catch (error) {
-        console.error(`[WinampControls] httpQ request failed: ${error}`);
+        console.error(`[WinampControls] ${endpoint} request failed: ${error}`);
         return {
             status: -1,
-            data: String(error)
+            data: String(error) as EndpointResponse<T>
         };
     }
 }
+
+// Generic endpoint wrapper
+function makeEndpoint<T extends EndpointName>(
+    endpoint: T,
+    paramKeys: (keyof EndpointParams<T>)[]
+) {
+    return async (
+        event: IpcMainInvokeEvent,
+        base: string,
+        password: string,
+        ...args: any[]
+    ): Promise<{ status: number; data: EndpointResponse<T>; }> => {
+        const params: Record<string, any> = { p: password };
+        paramKeys.forEach((key, i) => {
+            if (args[i] !== undefined) {
+                (params as any)[key] = args[i];
+            }
+        });
+        return call(event, base, endpoint, params as EndpointParams<T>);
+    };
+}
+
+// Exported endpoints using the generic wrapper
+export const getVersion = makeEndpoint("getVersion", []);
+export const restart = makeEndpoint("restart", []);
+export const internet = makeEndpoint("internet", []);
+export const play = makeEndpoint("play", []);
+export const pause = makeEndpoint("pause", []);
+export const stop = makeEndpoint("stop", []);
+export const next = makeEndpoint("next", []);
+export const prev = makeEndpoint("prev", []);
+export const isPlaying = makeEndpoint("isPlaying", []);
+export const getOutputTime = makeEndpoint("getOutputTime", ["frmt"]);
+export const jumpToTime = makeEndpoint("jumpToTime", ["ms"]);
+export const getCurrentTitle = makeEndpoint("getCurrentTitle", []);
+export const getVolume = makeEndpoint("getVolume", []);
+export const setVolume = makeEndpoint("setVolume", ["level"]);
+export const volumeUp = makeEndpoint("volumeUp", []);
+export const volumeDown = makeEndpoint("volumeDown", []);
+export const getListLength = makeEndpoint("getListLength", []);
+export const getListPos = makeEndpoint("getListPos", []);
+export const setPlaylistPos = makeEndpoint("setPlaylistPos", ["index"]);
+export const getPlaylistFile = makeEndpoint("getPlaylistFile", ["index"]);
+export const getPlaylistTitle = makeEndpoint("getPlaylistTitle", ["index"]);
+export const getPlaylistTitleList = makeEndpoint("getPlaylistTitleList", ["delim"]);
+export const repeat = makeEndpoint("repeat", ["enable"]);
+export const repeatStatus = makeEndpoint("repeatStatus", []);
+export const shuffle = makeEndpoint("shuffle", ["enable"]);
+export const shuffleStatus = makeEndpoint("shuffleStatus", []);
+export const getId3Tag = makeEndpoint("getId3Tag", ["tags", "delim", "index"]);
+export const hasId3Tag = makeEndpoint("hasId3Tag", ["index"]);
+export const getEqData = makeEndpoint("getEqData", ["band"]);
+export const setEqData = makeEndpoint("setEqData", ["band", "level"]);
