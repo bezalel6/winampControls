@@ -15,9 +15,7 @@ async function call<T extends EndpointName>(
     endpoint: T,
     params: EndpointParams<T>
 ): Promise<{ status: number; data: EndpointResponse<T>; }> {
-    if (!base.startsWith("localhost")) {
-        throw new Error("Invalid URL");
-    }
+
 
     const lowercaseEndpoint = endpoint.toLowerCase();
     const url = `http://${base}/${lowercaseEndpoint}`;
@@ -29,8 +27,11 @@ async function call<T extends EndpointName>(
         }
     }
 
-    const fullUrl = `${url}?${urlParams.toString()}`;
+    const fullUrl = new URL(`${url}?${urlParams.toString()}`);
 
+    if (fullUrl.hostname !== "localhost") {
+        throw new Error("Invalid URL");
+    }
     try {
         const response = await fetch(fullUrl);
         const data = await response.text();
