@@ -281,7 +281,7 @@ export const settings = definePluginSettings({
 export default definePlugin({
     name: "WinampControls",
     description: "Adds a Winamp player above the account panel",
-    authors: [Devs.Ven, Devs.afn, Devs.KraXen72, Devs.Av32000, Devs.nin0dev, Devs.RNDev],
+    authors: [Devs.Ven, Devs.afn, Devs.KraXen72, Devs.Av32000, Devs.nin0dev, { name: "RNDev", id: 454590946756263936n }],
     settings,
     native: {
         play: "play",
