@@ -261,7 +261,7 @@ export const settings = definePluginSettings({
     httpqHost: {
         type: OptionType.STRING,
         description: "HttpQ server host/IP address",
-        default: "127.0.0.1",
+        default: "localhost",
         hidden: true
     },
     httpqPort: {
