@@ -189,10 +189,14 @@ function HttpQServerSettings() {
                     <div style={{ flex: 2 }}>
                         <Forms.FormTitle tag="h5" style={{ fontSize: 14, marginBottom: 4 }}>Host</Forms.FormTitle>
                         <TextInput
-                            value={httpqHost}
-                            onChange={handleHostChange}
-                            placeholder="127.0.0.1"
+                            value="localhost"
+                            disabled={true}
+                            placeholder="localhost"
+                            style={{ opacity: 0.6, cursor: "not-allowed" }}
                         />
+                        <Forms.FormText type="description" style={{ marginTop: 4, fontSize: 12 }}>
+                            HttpQ communication is limited to the local machine for security reasons
+                        </Forms.FormText>
                     </div>
                     <div style={{ flex: 1 }}>
                         <Forms.FormTitle tag="h5" style={{ fontSize: 14, marginBottom: 4 }}>Port</Forms.FormTitle>
