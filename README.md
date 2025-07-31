@@ -5,7 +5,7 @@ Control Winamp directly from Discord with a sleek player interface displayed abo
 ## Requirements
 
 - **Winamp** with the **HttpQ plugin** installed and configured
-- Download HttpQ from: [HttpQ Plugin](https://github.com/losnoco/httpq)
+- Download HttpQ from: [HttpQ Plugin](https://sourceforge.net/projects/httpq/files/)
 
 ## Setup
 
