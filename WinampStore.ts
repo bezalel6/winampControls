@@ -189,12 +189,23 @@ export const WinampStore = proxyLazyWebpack(() => {
                             position: state.position
                         };
 
+                        // Get the filtered update that respects optimistic timestamps
+                        const filteredFluxUpdate = this.optimisticController.getFilteredPollingUpdate(pollingState, pollInitiatedAt);
+
                         // Apply the filtered update to the store
-                        // The optimistic controller already handles conflict resolution with timestamp-based filtering
                         this.applyPollingUpdate(pollingState, pollInitiatedAt);
 
-                        // Removed Flux dispatch to eliminate dual state management conflict
-                        // The store is already updated with proper conflict resolution above
+                        // Dispatch ONLY the filtered data to Flux to prevent overriding optimistic updates
+                        (FluxDispatcher as any).dispatch({
+                            type: "WINAMP_PLAYER_STATE",
+                            track: filteredFluxUpdate.track ?? this.track,
+                            volume: filteredFluxUpdate.volume ?? this.volume,
+                            isPlaying: filteredFluxUpdate.isPlaying ?? this.isPlaying,
+                            repeat: filteredFluxUpdate.repeat ?? this.repeat,
+                            shuffle: filteredFluxUpdate.shuffle ?? this.shuffle,
+                            position: filteredFluxUpdate.position ?? this.position,
+                            isConnected: state.isConnected
+                        });
                     }
                 } catch (error) {
                     if (error instanceof ConsecutiveFailuresError) {
@@ -213,13 +224,21 @@ export const WinampStore = proxyLazyWebpack(() => {
                         };
 
                         const disconnectedPollTime = Date.now();
+                        const filteredDisconnectedUpdate = this.optimisticController.getFilteredPollingUpdate(disconnectedState, disconnectedPollTime);
 
-                        // Apply the filtered update to the store
-                        // The optimistic controller handles conflict resolution internally
                         this.applyPollingUpdate(disconnectedState, disconnectedPollTime);
 
-                        // Removed Flux dispatch to eliminate dual state management conflict
-                        // The store is already updated with proper conflict resolution above
+                        // Dispatch ONLY the filtered disconnected state to Flux
+                        (FluxDispatcher as any).dispatch({
+                            type: "WINAMP_PLAYER_STATE",
+                            track: filteredDisconnectedUpdate.track ?? this.track,
+                            volume: filteredDisconnectedUpdate.volume ?? this.volume,
+                            isPlaying: filteredDisconnectedUpdate.isPlaying ?? this.isPlaying,
+                            repeat: filteredDisconnectedUpdate.repeat ?? this.repeat,
+                            shuffle: filteredDisconnectedUpdate.shuffle ?? this.shuffle,
+                            position: filteredDisconnectedUpdate.position ?? this.position,
+                            isConnected: false
+                        });
                     } else {
                         console.error("[WinampControls] Polling error:", error);
                     }
