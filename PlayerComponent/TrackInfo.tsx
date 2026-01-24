@@ -28,6 +28,9 @@ const cl = classNameFactory("vc-winamp-");
 // Default placeholder for when album art is not available
 const DEFAULT_ALBUM_ART = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' fill='%23666'%3E%3Crect width='48' height='48' fill='%232f3136'/%3E%3Ccircle cx='24' cy='24' r='16' fill='none' stroke='%23444' stroke-width='2'/%3E%3Ccircle cx='24' cy='24' r='6' fill='%23444'/%3E%3C/svg%3E";
 
+// Persist expanded state across track changes
+let persistedCoverExpanded = false;
+
 function AlbumContextMenu({ track, albumArtUrl }: { track: Track; albumArtUrl: string; }) {
     const hasAlbumArt = albumArtUrl !== DEFAULT_ALBUM_ART;
 
@@ -77,7 +80,7 @@ export function TrackInfo({ track }: { track: Track; }) {
     const trackName = track.name || "Unknown";
     const artistName = track.artist || "Unknown Artist";
     const [imageError, setImageError] = useState(false);
-    const [coverExpanded, setCoverExpanded] = useState(false);
+    const [coverExpanded, setCoverExpanded] = useState(persistedCoverExpanded);
 
     const albumArtUrl = (!imageError && track.albumArt) ? track.albumArt : DEFAULT_ALBUM_ART;
     const hasAlbumArt = albumArtUrl !== DEFAULT_ALBUM_ART;
@@ -91,7 +94,9 @@ export function TrackInfo({ track }: { track: Track; }) {
 
     const handleImageClick = () => {
         if (hasAlbumArt) {
-            setCoverExpanded(!coverExpanded);
+            const newState = !coverExpanded;
+            setCoverExpanded(newState);
+            persistedCoverExpanded = newState;
         }
     };
 
@@ -101,11 +106,10 @@ export function TrackInfo({ track }: { track: Track; }) {
         ));
     };
 
-    // Reset error state when track changes
+    // Reset error state when track changes (but keep expanded state)
     React.useEffect(() => {
         debugLog("TrackInfo", `Track changed, resetting error state. New track: "${track.artist}" - "${track.name}", albumArt=${track.albumArt ? "present" : "undefined"}`);
         setImageError(false);
-        setCoverExpanded(false);
     }, [track.id]);
 
     const albumImage = (
