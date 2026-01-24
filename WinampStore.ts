@@ -19,6 +19,8 @@
 import { proxyLazyWebpack } from "@webpack";
 import { Flux, FluxDispatcher } from "@webpack/common";
 
+import { fetchAlbumArt } from "./AlbumArtService";
+import { debugError, debugLog } from "./debugLog";
 import { OptimisticMediaController, type StoreState, type WinampMediaAction } from "./OptimisticMediaController";
 import { ConsecutiveFailuresError, type HTTPQConfig, type PlayerState, type RepeatMode, type Track, WinampClient } from "./WinampClient";
 
@@ -90,6 +92,9 @@ export const WinampStore = proxyLazyWebpack(() => {
         // The optimistic media controller - handles all optimistic updates
         private optimisticController: OptimisticMediaController;
 
+        // Track the last track ID to detect track changes for album art fetching
+        private lastTrackId: string | null = null;
+
         constructor(dispatcher: any, actionHandlers: any) {
             super(dispatcher, actionHandlers);
             this.client = new WinampClient(this.config);
@@ -141,7 +146,7 @@ export const WinampStore = proxyLazyWebpack(() => {
             try {
                 return await this.client.getPlayerState();
             } catch (error) {
-                console.error("[WinampControls] Failed to get current state:", error);
+                debugError("WinampStore", "Failed to get current state:", error);
                 return null;
             }
         }
@@ -151,8 +156,43 @@ export const WinampStore = proxyLazyWebpack(() => {
             try {
                 return await this.client.getPlaylist();
             } catch (error) {
-                console.error("[WinampControls] Failed to get playlist:", error);
+                debugError("WinampStore", "Failed to get playlist:", error);
                 return [];
+            }
+        }
+
+        // Fetch album art for a track and update the store
+        private async fetchAlbumArtForTrack(track: Track): Promise<void> {
+            debugLog("WinampStore:AlbumArt", `Initiating fetch for track: "${track.artist}" - "${track.name}" (id=${track.id})`);
+
+            try {
+                const result = await fetchAlbumArt(track.artist, track.name, track.album);
+
+                if (result) {
+                    // Check if track is still current (might have changed during fetch)
+                    if (this.track && this.track.id === track.id) {
+                        debugLog("WinampStore:AlbumArt", `✓ Applying album art to store (source=${result.source})`);
+
+                        // Update the track with album art
+                        this.track = { ...this.track, albumArt: result.url };
+                        this.emitChange();
+
+                        // Also dispatch to Flux so components re-render
+                        (FluxDispatcher as any).dispatch({
+                            type: "WINAMP_ALBUM_ART_UPDATE",
+                            trackId: track.id,
+                            albumArt: result.url
+                        });
+
+                        debugLog("WinampStore:AlbumArt", "✓ Store updated and Flux dispatched");
+                    } else {
+                        debugLog("WinampStore:AlbumArt", `⚠ Track changed during fetch, discarding result (was=${track.id}, now=${this.track?.id ?? "null"})`);
+                    }
+                } else {
+                    debugLog("WinampStore:AlbumArt", `✗ No album art found for "${track.artist}" - "${track.name}"`);
+                }
+            } catch (error) {
+                debugError("WinampStore:AlbumArt", "✗ Fetch error:", error);
             }
         }
 
@@ -162,7 +202,7 @@ export const WinampStore = proxyLazyWebpack(() => {
                 clearInterval(this.pollingInterval);
             }
 
-            console.log("[WinampControls] Starting state polling");
+            debugLog("WinampStore", "Starting state polling");
             this.isPollingEnabled = true;
             this.lastConsecutiveFailure = null;
 
@@ -179,9 +219,28 @@ export const WinampStore = proxyLazyWebpack(() => {
                 try {
                     const state = await this.getCurrentState();
                     if (state) {
+                        // Check if track changed and fetch album art if needed
+                        const currentTrackId = state.track?.id ?? null;
+                        if (currentTrackId !== this.lastTrackId) {
+                            debugLog("WinampStore", `Track changed: "${this.lastTrackId}" → "${currentTrackId}"`);
+                            this.lastTrackId = currentTrackId;
+
+                            if (state.track) {
+                                debugLog("WinampStore", `New track detected: "${state.track.artist}" - "${state.track.name}"`);
+                                // Fetch album art asynchronously (don't block polling)
+                                this.fetchAlbumArtForTrack(state.track);
+                            }
+                        }
+
+                        // Preserve albumArt if track ID hasn't changed
+                        let trackWithAlbumArt = state.track;
+                        if (state.track && this.track && state.track.id === this.track.id && this.track.albumArt) {
+                            trackWithAlbumArt = { ...state.track, albumArt: this.track.albumArt };
+                        }
+
                         // Apply polling update with timestamp-based conflict resolution
                         const pollingState = {
-                            track: state.track,
+                            track: trackWithAlbumArt,
                             volume: state.volume,
                             isPlaying: state.isPlaying,
                             repeat: state.repeat,
@@ -209,7 +268,7 @@ export const WinampStore = proxyLazyWebpack(() => {
                     }
                 } catch (error) {
                     if (error instanceof ConsecutiveFailuresError) {
-                        console.error(`[WinampControls] Stopping polling due to consecutive failures: ${error.message}`);
+                        debugError("WinampStore", `Stopping polling due to consecutive failures: ${error.message}`);
                         this.lastConsecutiveFailure = error;
                         this.isPollingEnabled = false;
 
@@ -240,7 +299,7 @@ export const WinampStore = proxyLazyWebpack(() => {
                             isConnected: false
                         });
                     } else {
-                        console.error("[WinampControls] Polling error:", error);
+                        debugError("WinampStore", "Polling error:", error);
                     }
                 }
             }, 1000) as unknown as number; // Poll every second
@@ -251,7 +310,7 @@ export const WinampStore = proxyLazyWebpack(() => {
             if (this.pollingInterval) {
                 clearInterval(this.pollingInterval);
                 this.pollingInterval = null;
-                console.log("[WinampControls] Stopped state polling");
+                debugLog("WinampStore", "Stopped state polling");
             }
             this.isPollingEnabled = false;
         }
@@ -259,7 +318,7 @@ export const WinampStore = proxyLazyWebpack(() => {
         // Attempt to reconnect after consecutive failures
         public async attemptReconnection(): Promise<boolean> {
             try {
-                console.log("[WinampControls] Attempting to reconnect...");
+                debugLog("WinampStore", "Attempting to reconnect...");
 
                 // Reset the failure count on the client
                 this.client.resetFailureCount();
@@ -268,16 +327,16 @@ export const WinampStore = proxyLazyWebpack(() => {
                 const isConnected = await this.client.isConnected();
 
                 if (isConnected) {
-                    console.log("[WinampControls] Reconnection successful, resuming polling");
+                    debugLog("WinampStore", "Reconnection successful, resuming polling");
                     this.isPollingEnabled = true;
                     this.lastConsecutiveFailure = null;
                     return true;
                 } else {
-                    console.log("[WinampControls] Reconnection failed");
+                    debugLog("WinampStore", "Reconnection failed");
                     return false;
                 }
             } catch (error) {
-                console.error("[WinampControls] Reconnection attempt failed:", error);
+                debugError("WinampStore", "Reconnection attempt failed:", error);
                 return false;
             }
         }
@@ -316,7 +375,7 @@ export const WinampStore = proxyLazyWebpack(() => {
             this.lastConsecutiveFailure = null;
 
             this.startStatePolling();
-            console.log(`[WinampControls] Configured httpQ: ${this.config.host}:${this.config.port}`);
+            debugLog("WinampStore", `Configured httpQ: ${this.config.host}:${this.config.port}`);
         }
 
         // Test httpQ connection
@@ -324,7 +383,7 @@ export const WinampStore = proxyLazyWebpack(() => {
             try {
                 return await this.client.isConnected();
             } catch (error) {
-                console.error("[WinampControls] httpQ connection failed:", error);
+                debugError("WinampStore", "httpQ connection failed:", error);
                 return false;
             }
         }
@@ -334,7 +393,7 @@ export const WinampStore = proxyLazyWebpack(() => {
             try {
                 return await WinampClient.testConfig(config);
             } catch (error) {
-                console.error("[WinampControls] httpQ configuration test failed:", error);
+                debugError("WinampStore", "httpQ configuration test failed:", error);
                 return false;
             }
         }
@@ -354,7 +413,7 @@ export const WinampStore = proxyLazyWebpack(() => {
             try {
                 return await WinampClient.testConfig(config);
             } catch (error) {
-                console.error("[WinampStore] Static connection test failed:", error);
+                debugError("WinampStore", "Static connection test failed:", error);
                 return false;
             }
         }
@@ -369,6 +428,13 @@ export const WinampStore = proxyLazyWebpack(() => {
             store.shuffle = e.shuffle ?? false;
             store.position = e.position ?? 0;
             store.emitChange();
+        },
+        WINAMP_ALBUM_ART_UPDATE(e: { trackId: string; albumArt: string; }) {
+            // Update album art on the current track if it matches
+            if (store.track && store.track.id === e.trackId) {
+                store.track = { ...store.track, albumArt: e.albumArt };
+                store.emitChange();
+            }
         }
     } as any);
 

@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { debugError, debugLog } from "./debugLog";
 import { type RepeatMode, type WinampClient } from "./WinampClient";
 
 // Winamp-specific store state
@@ -62,10 +63,10 @@ export class OptimisticMediaController {
 
         try {
             const result = await action.clientMethod(this.client, args);
-            console.log(`[OptimisticMediaController] ${endpoint} completed successfully`);
+            debugLog("OptimisticMediaController", `${endpoint} completed successfully`);
             return result;
         } catch (error) {
-            console.error(`[OptimisticMediaController] Failed to execute ${endpoint}:`, error);
+            debugError("OptimisticMediaController", `Failed to execute ${endpoint}:`, error);
 
             if (action.errorHandler) {
                 const errorState = action.errorHandler(error, args);
@@ -135,10 +136,10 @@ export class OptimisticMediaController {
                     this.optimisticUpdateTimestamps.delete(stateKey);
                     this.optimisticExpectedValues.delete(stateKey);
                     (filteredUpdate as any)[key] = value;
-                    console.log(`[OptimisticMediaController] Server confirmed optimistic update for '${key}': ${JSON.stringify(value)}`);
+                    debugLog("OptimisticMediaController", `Server confirmed optimistic update for '${key}': ${JSON.stringify(value)}`);
                 } else {
                     // Optimistic update is newer than poll and not confirmed - skip this key
-                    console.log(`[OptimisticMediaController] Skipping polling update for '${key}' due to recent optimistic update`);
+                    debugLog("OptimisticMediaController", `Skipping polling update for '${key}' due to recent optimistic update`);
                 }
             }
         });
@@ -176,7 +177,7 @@ export class OptimisticMediaController {
         });
 
         if (expiredKeys.length > 0) {
-            console.log(`[OptimisticMediaController] Cleared ${expiredKeys.length} expired optimistic timestamps`);
+            debugLog("OptimisticMediaController", `Cleared ${expiredKeys.length} expired optimistic timestamps`);
         }
     }
 
