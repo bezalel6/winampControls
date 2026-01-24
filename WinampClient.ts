@@ -6,6 +6,8 @@
 
 import type { EndpointName, EndpointParams, EndpointResponse, RepeatMode, VolumeLevel } from "./types/endpoints";
 
+export type { RepeatMode };
+
 // HTTPQConfig interface for connection configuration
 export interface HTTPQConfig {
     host: string;
