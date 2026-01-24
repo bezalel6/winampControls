@@ -24,6 +24,7 @@ import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { Button, Forms, React, Switch, TextInput } from "@webpack/common";
 
+import { setDebugEnabled } from "./debugLog";
 import hoverOnlyStyle from "./hoverOnly.css?managed";
 import { Player } from "./PlayerComponent";
 import { type HTTPQConfig, WinampStore } from "./WinampStore";
@@ -41,7 +42,7 @@ function updateHttpQConfig() {
 }
 
 function UICustomizationSettings() {
-    const { hoverControls, previousButtonRestartsTrack, showSeeker } = settings.use(["hoverControls", "previousButtonRestartsTrack", "showSeeker"]);
+    const { hoverControls, previousButtonRestartsTrack, showSeeker, debugLogging } = settings.use(["hoverControls", "previousButtonRestartsTrack", "showSeeker", "debugLogging"]);
 
     function handleHoverControlsChange(value: boolean) {
         settings.store.hoverControls = value;
@@ -54,6 +55,11 @@ function UICustomizationSettings() {
 
     function handleShowSeekerChange(value: boolean) {
         settings.store.showSeeker = value;
+    }
+
+    function handleDebugLoggingChange(value: boolean) {
+        settings.store.debugLogging = value;
+        setDebugEnabled(value);
     }
 
     return (
@@ -93,6 +99,14 @@ function UICustomizationSettings() {
                         note="Display seek bar in controls"
                     >
                         Show seeker
+                    </Switch>
+
+                    <Switch
+                        value={debugLogging}
+                        onChange={handleDebugLoggingChange}
+                        note="Log debug info to console"
+                    >
+                        Debug logging
                     </Switch>
                 </div>
             </Forms.FormSection>
@@ -258,6 +272,12 @@ export const settings = definePluginSettings({
         default: true,
         hidden: true
     },
+    debugLogging: {
+        type: OptionType.BOOLEAN,
+        description: "Enable debug logging to console",
+        default: false,
+        hidden: true
+    },
     httpqSettings: {
         type: OptionType.COMPONENT,
         component: HttpQServerSettings
@@ -327,6 +347,7 @@ export default definePlugin({
 
     start: () => {
         toggleHoverControls(settings.store.hoverControls);
+        setDebugEnabled(settings.store.debugLogging);
         updateHttpQConfig();
     },
 

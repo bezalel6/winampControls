@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { debugError, debugLog } from "./debugLog";
 import type { EndpointName, EndpointParams, EndpointResponse, RepeatMode, VolumeLevel } from "./types/endpoints";
 
 export type { RepeatMode };
@@ -130,7 +131,7 @@ export class WinampClient {
             this.consecutiveFailures = 0;
             this.isConnectedState = true;
             if (!this.isPollingCall(endpoint)) {
-                console.log(`[WinampClient] ${endpoint}: ${this.formatLogData(String(result.data).trim())}`);
+                debugLog("WinampClient", `${endpoint}: ${this.formatLogData(String(result.data).trim())}`);
             }
             return result;
         } catch (error) {
@@ -142,7 +143,7 @@ export class WinampClient {
     private handleCallFailure(endpoint: EndpointName, error: any) {
         this.isConnectedState = false;
         this.consecutiveFailures++;
-        console.error(`[WinampClient] ${endpoint} failed (${this.consecutiveFailures}/${this.maxConsecutiveFailures}):`, error);
+        debugError("WinampClient", `${endpoint} failed (${this.consecutiveFailures}/${this.maxConsecutiveFailures}):`, error);
         if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
             throw new ConsecutiveFailuresError(this.consecutiveFailures);
         }
@@ -206,7 +207,7 @@ export class WinampClient {
                 isConnected: this.isConnectedState
             };
             if (track) {
-                console.log(`[WinampClient] Poll: "${track.name}" by ${track.artist} | ${this.formatTime(positionMs)}/${this.formatTime(lengthMs)} | Vol: ${volumeNum}% | ${statusNum === 1 ? "Playing" : statusNum === 3 ? "Paused" : "Stopped"}`);
+                debugLog("WinampClient", `Poll: "${track.name}" by ${track.artist} | ${this.formatTime(positionMs)}/${this.formatTime(lengthMs)} | Vol: ${volumeNum}% | ${statusNum === 1 ? "Playing" : statusNum === 3 ? "Paused" : "Stopped"}`);
             }
             return state;
         } catch (error) {
@@ -399,7 +400,7 @@ export class WinampClient {
             }
             return true;
         } catch (error) {
-            console.error("[WinampClient] Configuration test failed:", error);
+            debugError("WinampClient", "Configuration test failed:", error);
             return false;
         }
     }
@@ -416,7 +417,7 @@ export class WinampClient {
     }
     public resetFailureCount() {
         this.consecutiveFailures = 0;
-        console.log("[WinampClient] Consecutive failure count reset");
+        debugLog("WinampClient", "Consecutive failure count reset");
     }
     public getConsecutiveFailures(): number {
         return this.consecutiveFailures;

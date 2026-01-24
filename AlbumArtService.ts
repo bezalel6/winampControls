@@ -7,6 +7,10 @@
 // Album art fetching service using native layer to bypass CSP
 // Routes requests through Electron main process
 
+import { debugError, debugLog } from "./debugLog";
+
+const LOG_PREFIX = "AlbumArt";
+
 export interface AlbumArtResult {
     url: string;
     source: "deezer" | "itunes" | "cache";
@@ -64,42 +68,40 @@ export async function fetchAlbumArt(
     track: string,
     album?: string
 ): Promise<AlbumArtResult | null> {
-    const logPrefix = "[AlbumArt]";
-
-    console.log(`${logPrefix} ────────────────────────────────────────`);
-    console.log(`${logPrefix} Request: artist="${artist}", track="${track}", album="${album ?? "(none)"}"`);
+    debugLog(LOG_PREFIX, "────────────────────────────────────────");
+    debugLog(LOG_PREFIX, `Request: artist="${artist}", track="${track}", album="${album ?? "(none)"}"`);
 
     // Validate inputs
     if (!artist || artist === "Unknown Artist") {
-        console.log(`${logPrefix} ✗ Skipped: Invalid artist`);
+        debugLog(LOG_PREFIX, "✗ Skipped: Invalid artist");
         return null;
     }
 
     if (!track || track === "Unknown Track") {
-        console.log(`${logPrefix} ✗ Skipped: Invalid track`);
+        debugLog(LOG_PREFIX, "✗ Skipped: Invalid track");
         return null;
     }
 
     const cacheKey = getCacheKey(artist, track, album);
-    console.log(`${logPrefix} Cache key: "${cacheKey}"`);
+    debugLog(LOG_PREFIX, `Cache key: "${cacheKey}"`);
 
     // Check cache first
     const cached = getFromCache(cacheKey);
     if (cached) {
-        console.log(`${logPrefix} ✓ Cache HIT: ${cached.url}`);
-        console.log(`${logPrefix} ────────────────────────────────────────`);
+        debugLog(LOG_PREFIX, `✓ Cache HIT: ${cached.url.substring(0, 50)}...`);
+        debugLog(LOG_PREFIX, "────────────────────────────────────────");
         return cached;
     }
-    console.log(`${logPrefix} Cache MISS`);
+    debugLog(LOG_PREFIX, "Cache MISS");
 
     // Check if there's already a pending request for this track
     const pending = pendingRequests.get(cacheKey);
     if (pending) {
-        console.log(`${logPrefix} ⏳ Waiting for pending request...`);
+        debugLog(LOG_PREFIX, "⏳ Waiting for pending request...");
         return pending;
     }
 
-    console.log(`${logPrefix} Fetching via native layer...`);
+    debugLog(LOG_PREFIX, "Fetching via native layer...");
 
     // Create new request
     const fetchPromise = (async (): Promise<AlbumArtResult | null> => {
@@ -110,14 +112,14 @@ export async function fetchAlbumArt(
             const nativeHelper = VencordNative.pluginHelpers.WinampControls;
 
             if (!nativeHelper || typeof nativeHelper.fetchAlbumArt !== "function") {
-                console.error(`${logPrefix} ✗ Native helper not available`);
+                debugError(LOG_PREFIX, "✗ Native helper not available");
                 return null;
             }
 
             const response = await nativeHelper.fetchAlbumArt(artist, track, album);
             const elapsed = Date.now() - startTime;
 
-            console.log(`${logPrefix} Native response: success=${response.success}, source=${response.source}, dataUrl=${response.dataUrl ? `${response.dataUrl.substring(0, 50)}...` : "undefined"}`);
+            debugLog(LOG_PREFIX, `Native response: success=${response.success}, source=${response.source}, dataUrl=${response.dataUrl ? `${response.dataUrl.substring(0, 50)}...` : "undefined"}`);
 
             if (response.success && response.dataUrl) {
                 const result: AlbumArtResult = {
@@ -127,20 +129,20 @@ export async function fetchAlbumArt(
                 };
 
                 setCache(cacheKey, result);
-                console.log(`${logPrefix} ✓ SUCCESS: Found via ${result.source} in ${elapsed}ms`);
-                console.log(`${logPrefix} ✓ Data URL length: ${result.url.length} chars`);
+                debugLog(LOG_PREFIX, `✓ SUCCESS: Found via ${result.source} in ${elapsed}ms`);
+                debugLog(LOG_PREFIX, `✓ Data URL length: ${result.url.length} chars`);
 
                 return result;
             } else {
-                console.log(`${logPrefix} ✗ FAILED: ${response.error || "No album art found"} (${elapsed}ms)`);
+                debugLog(LOG_PREFIX, `✗ FAILED: ${response.error || "No album art found"} (${elapsed}ms)`);
                 return null;
             }
         } catch (error) {
-            console.error(`${logPrefix} ✗ ERROR:`, error);
+            debugError(LOG_PREFIX, "✗ ERROR:", error);
             return null;
         } finally {
             pendingRequests.delete(cacheKey);
-            console.log(`${logPrefix} ────────────────────────────────────────`);
+            debugLog(LOG_PREFIX, "────────────────────────────────────────");
         }
     })();
 
@@ -155,7 +157,7 @@ export async function fetchAlbumArt(
 export function clearAlbumArtCache(): void {
     albumArtCache.clear();
     cacheTimestamps.clear();
-    console.log("[AlbumArt] Cache cleared");
+    debugLog(LOG_PREFIX, "Cache cleared");
 }
 
 /**

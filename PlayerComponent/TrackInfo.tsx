@@ -17,8 +17,10 @@
 */
 
 import { classNameFactory } from "@api/Styles";
-import { React, useState } from "@webpack/common";
+import { openImageModal } from "@utils/discord";
+import { ContextMenuApi, Menu, React, useState } from "@webpack/common";
 
+import { debugLog } from "../debugLog";
 import { type Track } from "../WinampStore";
 
 const cl = classNameFactory("vc-winamp-");
@@ -26,36 +28,111 @@ const cl = classNameFactory("vc-winamp-");
 // Default placeholder for when album art is not available
 const DEFAULT_ALBUM_ART = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' fill='%23666'%3E%3Crect width='48' height='48' fill='%232f3136'/%3E%3Ccircle cx='24' cy='24' r='16' fill='none' stroke='%23444' stroke-width='2'/%3E%3Ccircle cx='24' cy='24' r='6' fill='%23444'/%3E%3C/svg%3E";
 
+function AlbumContextMenu({ track, albumArtUrl }: { track: Track; albumArtUrl: string; }) {
+    const hasAlbumArt = albumArtUrl !== DEFAULT_ALBUM_ART;
+
+    return (
+        <Menu.Menu
+            navId="winamp-album-menu"
+            onClose={() => ContextMenuApi.closeContextMenu()}
+            aria-label="Winamp Album Menu"
+        >
+            {hasAlbumArt && (
+                <Menu.MenuItem
+                    key="view-cover"
+                    id="view-cover"
+                    label="View Album Cover"
+                    action={() => openImageModal(albumArtUrl)}
+                />
+            )}
+            {track.album && (
+                <Menu.MenuItem
+                    key="album-info"
+                    id="album-info"
+                    label={`Album: ${track.album}`}
+                    disabled={true}
+                />
+            )}
+            {track.year && (
+                <Menu.MenuItem
+                    key="year-info"
+                    id="year-info"
+                    label={`Year: ${track.year}`}
+                    disabled={true}
+                />
+            )}
+            {track.genre && (
+                <Menu.MenuItem
+                    key="genre-info"
+                    id="genre-info"
+                    label={`Genre: ${track.genre}`}
+                    disabled={true}
+                />
+            )}
+        </Menu.Menu>
+    );
+}
+
 export function TrackInfo({ track }: { track: Track; }) {
     const trackName = track.name || "Unknown";
     const artistName = track.artist || "Unknown Artist";
     const [imageError, setImageError] = useState(false);
+    const [coverExpanded, setCoverExpanded] = useState(false);
 
     const albumArtUrl = (!imageError && track.albumArt) ? track.albumArt : DEFAULT_ALBUM_ART;
+    const hasAlbumArt = albumArtUrl !== DEFAULT_ALBUM_ART;
 
-    // Debug logging
-    console.log(`[TrackInfo] Render: track.albumArt=${track.albumArt ?? "undefined"}, imageError=${imageError}, using=${albumArtUrl.substring(0, 50)}...`);
+    debugLog("TrackInfo", `Render: track.albumArt=${track.albumArt ? `${track.albumArt.substring(0, 50)}...` : "undefined"}, imageError=${imageError}`);
 
     const handleImageError = () => {
-        console.log(`[TrackInfo] Image load error for: ${track.albumArt}`);
+        debugLog("TrackInfo", `Image load error for: ${track.albumArt}`);
         setImageError(true);
+    };
+
+    const handleImageClick = () => {
+        if (hasAlbumArt) {
+            setCoverExpanded(!coverExpanded);
+        }
+    };
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        ContextMenuApi.openContextMenu(e, () => (
+            <AlbumContextMenu track={track} albumArtUrl={albumArtUrl} />
+        ));
     };
 
     // Reset error state when track changes
     React.useEffect(() => {
-        console.log(`[TrackInfo] Track changed, resetting error state. New track: "${track.artist}" - "${track.name}", albumArt=${track.albumArt ?? "undefined"}`);
+        debugLog("TrackInfo", `Track changed, resetting error state. New track: "${track.artist}" - "${track.name}", albumArt=${track.albumArt ? "present" : "undefined"}`);
         setImageError(false);
+        setCoverExpanded(false);
     }, [track.id]);
 
+    const albumImage = (
+        <img
+            id={cl("album-image")}
+            src={albumArtUrl}
+            alt={track.album ? `${track.album} album art` : "Album art"}
+            onError={handleImageError}
+            onClick={handleImageClick}
+            onContextMenu={handleContextMenu}
+            draggable={false}
+        />
+    );
+
+    // Expanded view - show full-width album art
+    if (coverExpanded && hasAlbumArt) {
+        return (
+            <div id={cl("album-expanded-wrapper")}>
+                {albumImage}
+            </div>
+        );
+    }
+
+    // Normal view - album art + track info
     return (
         <div id={cl("info-wrapper")}>
-            <img
-                id={cl("album-image")}
-                src={albumArtUrl}
-                alt={track.album ? `${track.album} album art` : "Album art"}
-                onError={handleImageError}
-                draggable={false}
-            />
+            {albumImage}
             <div id={cl("titles")}>
                 <div id={cl("song-title")} className={cl("ellipoverflow")}>
                     {trackName}
