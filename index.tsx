@@ -45,7 +45,7 @@ function updateHttpQConfig() {
 }
 
 function UICustomizationSettings() {
-    const { hoverControls, previousButtonRestartsTrack, debugLogging } = settings.use(["hoverControls", "previousButtonRestartsTrack", "debugLogging"]);
+    const { hoverControls, previousButtonRestartsTrack, debugLogging, showSeekBar, showVolumeBar } = settings.use(["hoverControls", "previousButtonRestartsTrack", "debugLogging", "showSeekBar", "showVolumeBar"]);
 
     function handleHoverControlsChange(value: boolean) {
         settings.store.hoverControls = value;
@@ -59,6 +59,14 @@ function UICustomizationSettings() {
     function handleDebugLoggingChange(value: boolean) {
         settings.store.debugLogging = value;
         setDebugEnabled(value);
+    }
+
+    function handleShowSeekBarChange(value: boolean) {
+        settings.store.showSeekBar = value;
+    }
+
+    function handleShowVolumeBarChange(value: boolean) {
+        settings.store.showVolumeBar = value;
     }
 
     return (
@@ -96,6 +104,22 @@ function UICustomizationSettings() {
                     onChange={handleDebugLoggingChange}
                     title="Debug logging"
                     description="Log debug info to console"
+                    hideBorder
+                />
+
+                <FormSwitch
+                    value={showSeekBar}
+                    onChange={handleShowSeekBarChange}
+                    title="Show seek bar"
+                    description="Show seek bar on player"
+                    hideBorder
+                />
+
+                <FormSwitch
+                    value={showVolumeBar}
+                    onChange={handleShowVolumeBarChange}
+                    title="Show volume bar"
+                    description="Show volume bar on player"
                     hideBorder
                 />
             </div>
@@ -256,6 +280,18 @@ export const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Enable debug logging to console",
         default: false,
+        hidden: true
+    },
+    showSeekBar: {
+        type: OptionType.BOOLEAN,
+        description: "Show seek bar on main player",
+        default: true,
+        hidden: true
+    },
+    showVolumeBar: {
+        type: OptionType.BOOLEAN,
+        description: "Show volume bar on main player",
+        default: true,
         hidden: true
     },
     httpqSettings: {

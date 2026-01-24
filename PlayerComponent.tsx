@@ -66,7 +66,7 @@ const SkipNext = Svg("M7.58 16.89l5.77-4.07c.56-.4.56-1.24 0-1.63L7.58 7.11C6.91
 const Repeat = Svg("M7 7h10v1.79c0 .45.54.67.85.35l2.79-2.79c.2-.2.2-.51 0-.71l-2.79-2.79c-.31-.31-.85-.09-.85.36V5H6c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1s1-.45 1-1V7zm10 10H7v-1.79c0-.45-.54-.67-.85-.35l-2.79 2.79c-.2.2-.2.51 0 .71l2.79 2.79c.31.31.85.09.85-.36V19h11c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1s-1 .45-1 1v3z", "repeat");
 const Shuffle = Svg("M10.59 9.17L6.12 4.7c-.39-.39-1.02-.39-1.41 0-.39.39-.39 1.02 0 1.41l4.46 4.46 1.42-1.4zm4.76-4.32l1.19 1.19L4.7 17.88c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L17.96 7.46l1.19 1.19c.31.31.85.09.85-.36V4.5c0-.28-.22-.5-.5-.5h-3.79c-.45 0-.67.54-.36.85zm-.52 8.56l-1.41 1.41 3.13 3.13-1.2 1.2c-.31.31-.09.85.36.85h3.79c.28 0 .5-.22.5-.5v-3.79c0-.45-.54-.67-.85-.35l-1.19 1.19-3.13-3.14z", "shuffle");
 
-function Button(props: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }) {
+function Button(props: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean; }) {
     const { active, className, ...rest } = props;
     return (
         <button
@@ -233,16 +233,20 @@ function WinampSeekBar() {
 // Default placeholder for when album art is not available
 const DEFAULT_ALBUM_ART = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' fill='%23666'%3E%3Crect width='48' height='48' fill='%232f3136'/%3E%3Ccircle cx='24' cy='24' r='16' fill='none' stroke='%23444' stroke-width='2'/%3E%3Ccircle cx='24' cy='24' r='6' fill='%23444'/%3E%3C/svg%3E";
 
-function AlbumContextMenu({ track }: { track: Track; }) {
+function PlayerContextMenu({ track }: { track: Track; }) {
     const volume = useStateFromStores([WinampStore], () => WinampStore.volume);
+    const [position, duration] = useStateFromStores(
+        [WinampStore],
+        () => [WinampStore.position, WinampStore.track?.duration ?? 0]
+    );
     const albumArtUrl = track.albumArt || DEFAULT_ALBUM_ART;
     const hasAlbumArt = albumArtUrl !== DEFAULT_ALBUM_ART;
 
     return (
         <Menu.Menu
-            navId="winamp-album-menu"
+            navId="winamp-player-menu"
             onClose={() => FluxDispatcher.dispatch({ type: "CONTEXT_MENU_CLOSE" })}
-            aria-label="Winamp Album Menu"
+            aria-label="Winamp Player Menu"
         >
             {hasAlbumArt && (
                 <Menu.MenuItem
@@ -261,6 +265,7 @@ function AlbumContextMenu({ track }: { track: Track; }) {
                     disabled={true}
                 />
             )}
+            {(!!track.album || hasAlbumArt) && <Menu.MenuSeparator />}
             <Menu.MenuControlItem
                 id="winamp-volume"
                 key="winamp-volume"
@@ -276,6 +281,24 @@ function AlbumContextMenu({ track }: { track: Track; }) {
                     />
                 )}
             />
+            {duration > 0 && (
+                <Menu.MenuControlItem
+                    id="winamp-seek"
+                    key="winamp-seek"
+                    label={`${msToHuman(position)} / ${msToHuman(duration)}`}
+                    control={(props, ref) => (
+                        <Menu.MenuSliderControl
+                            {...props}
+                            ref={ref}
+                            value={position}
+                            minValue={0}
+                            maxValue={duration}
+                            onChange={debounce((v: number) => WinampStore.executeMediaAction("seek", v))}
+                            renderValue={() => null}
+                        />
+                    )}
+                />
+            )}
         </Menu.Menu>
     );
 }
@@ -292,9 +315,6 @@ function Info({ track }: { track: Track; }) {
             src={albumArtUrl}
             alt="Album cover"
             onClick={() => hasAlbumArt && setCoverExpanded(!coverExpanded)}
-            onContextMenu={e => {
-                ContextMenuApi.openContextMenu(e, () => <AlbumContextMenu track={track} />);
-            }}
             className={classes(hasAlbumArt && cl("album-image-clickable"))}
         />
     );
@@ -349,6 +369,7 @@ export function Player() {
 
     const isPlaying = useStateFromStores([WinampStore], () => WinampStore.isPlaying);
     const [shouldHide, setShouldHide] = useState(false);
+    const { showSeekBar, showVolumeBar } = settings.use(["showSeekBar", "showVolumeBar"]);
 
     // Hide player after 5 minutes of inactivity
     React.useEffect(() => {
@@ -367,12 +388,18 @@ export function Player() {
     } as React.CSSProperties;
 
     return (
-        <div id={cl("player")} style={exportTrackImageStyle}>
+        <div
+            id={cl("player")}
+            style={exportTrackImageStyle}
+            onContextMenu={e => {
+                ContextMenuApi.openContextMenu(e, () => <PlayerContextMenu track={track} />);
+            }}
+        >
             <Info track={track} />
             <div className={cl("playback-section")}>
-                <WinampSeekBar />
+                {showSeekBar && <WinampSeekBar />}
                 <Controls />
-                <VolumeBar />
+                {showVolumeBar && <VolumeBar />}
             </div>
         </div>
     );
