@@ -40,6 +40,7 @@ export interface Track {
     track?: string;
     filePath: string;
     playlistIndex: number;
+    albumArt?: string; // URL to album art image
 }
 
 // UI-friendly player state - consolidated and ready to use

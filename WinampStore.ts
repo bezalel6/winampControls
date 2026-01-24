@@ -19,6 +19,7 @@
 import { proxyLazyWebpack } from "@webpack";
 import { Flux, FluxDispatcher } from "@webpack/common";
 
+import { fetchAlbumArt } from "./AlbumArtService";
 import { OptimisticMediaController, type StoreState, type WinampMediaAction } from "./OptimisticMediaController";
 import { ConsecutiveFailuresError, type HTTPQConfig, type PlayerState, type RepeatMode, type Track, WinampClient } from "./WinampClient";
 
@@ -90,6 +91,9 @@ export const WinampStore = proxyLazyWebpack(() => {
         // The optimistic media controller - handles all optimistic updates
         private optimisticController: OptimisticMediaController;
 
+        // Track the last track ID to detect track changes for album art fetching
+        private lastTrackId: string | null = null;
+
         constructor(dispatcher: any, actionHandlers: any) {
             super(dispatcher, actionHandlers);
             this.client = new WinampClient(this.config);
@@ -156,6 +160,41 @@ export const WinampStore = proxyLazyWebpack(() => {
             }
         }
 
+        // Fetch album art for a track and update the store
+        private async fetchAlbumArtForTrack(track: Track): Promise<void> {
+            console.log(`[WinampStore:AlbumArt] Initiating fetch for track: "${track.artist}" - "${track.name}" (id=${track.id})`);
+
+            try {
+                const result = await fetchAlbumArt(track.artist, track.name, track.album);
+
+                if (result) {
+                    // Check if track is still current (might have changed during fetch)
+                    if (this.track && this.track.id === track.id) {
+                        console.log(`[WinampStore:AlbumArt] ✓ Applying album art to store (source=${result.source})`);
+
+                        // Update the track with album art
+                        this.track = { ...this.track, albumArt: result.url };
+                        this.emitChange();
+
+                        // Also dispatch to Flux so components re-render
+                        (FluxDispatcher as any).dispatch({
+                            type: "WINAMP_ALBUM_ART_UPDATE",
+                            trackId: track.id,
+                            albumArt: result.url
+                        });
+
+                        console.log(`[WinampStore:AlbumArt] ✓ Store updated and Flux dispatched`);
+                    } else {
+                        console.log(`[WinampStore:AlbumArt] ⚠ Track changed during fetch, discarding result (was=${track.id}, now=${this.track?.id ?? "null"})`);
+                    }
+                } else {
+                    console.log(`[WinampStore:AlbumArt] ✗ No album art found for "${track.artist}" - "${track.name}"`);
+                }
+            } catch (error) {
+                console.error("[WinampStore:AlbumArt] ✗ Fetch error:", error);
+            }
+        }
+
         // Start polling for player state updates
         public startStatePolling() {
             if (this.pollingInterval) {
@@ -179,9 +218,28 @@ export const WinampStore = proxyLazyWebpack(() => {
                 try {
                     const state = await this.getCurrentState();
                     if (state) {
+                        // Check if track changed and fetch album art if needed
+                        const currentTrackId = state.track?.id ?? null;
+                        if (currentTrackId !== this.lastTrackId) {
+                            console.log(`[WinampStore] Track changed: "${this.lastTrackId}" → "${currentTrackId}"`);
+                            this.lastTrackId = currentTrackId;
+
+                            if (state.track) {
+                                console.log(`[WinampStore] New track detected: "${state.track.artist}" - "${state.track.name}"`);
+                                // Fetch album art asynchronously (don't block polling)
+                                this.fetchAlbumArtForTrack(state.track);
+                            }
+                        }
+
+                        // Preserve albumArt if track ID hasn't changed
+                        let trackWithAlbumArt = state.track;
+                        if (state.track && this.track && state.track.id === this.track.id && this.track.albumArt) {
+                            trackWithAlbumArt = { ...state.track, albumArt: this.track.albumArt };
+                        }
+
                         // Apply polling update with timestamp-based conflict resolution
                         const pollingState = {
-                            track: state.track,
+                            track: trackWithAlbumArt,
                             volume: state.volume,
                             isPlaying: state.isPlaying,
                             repeat: state.repeat,
@@ -369,6 +427,13 @@ export const WinampStore = proxyLazyWebpack(() => {
             store.shuffle = e.shuffle ?? false;
             store.position = e.position ?? 0;
             store.emitChange();
+        },
+        WINAMP_ALBUM_ART_UPDATE(e: { trackId: string; albumArt: string; }) {
+            // Update album art on the current track if it matches
+            if (store.track && store.track.id === e.trackId) {
+                store.track = { ...store.track, albumArt: e.albumArt };
+                store.emitChange();
+            }
         }
     } as any);
 

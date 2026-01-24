@@ -83,17 +83,24 @@
     align-items: center;
     height: 3em;
     gap: var(--vc-winamp-spacing-sm);
+    overflow: hidden;
 }
 
 #vc-winamp-album-image {
-    height: var(--vc-winamp-album-height);
-    object-fit: contain;
+    height: 3em;
+    width: 3em;
+    min-width: 3em;
+    object-fit: cover;
     border-radius: var(--vc-winamp-border-radius-sm);
-    transition: filter var(--vc-winamp-transition-normal) var(--vc-winamp-transition-easing);
+    transition: filter var(--vc-winamp-transition-normal) var(--vc-winamp-transition-easing),
+                transform var(--vc-winamp-transition-normal) var(--vc-winamp-transition-easing);
+    background-color: var(--vc-winamp-bg-secondary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 #vc-winamp-album-image:hover {
-    filter: brightness(1.2);
+    filter: brightness(1.1);
+    transform: scale(1.05);
     cursor: pointer;
 }
 
