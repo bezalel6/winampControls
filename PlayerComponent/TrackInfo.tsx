@@ -45,7 +45,7 @@ function AlbumContextMenu({ track, albumArtUrl }: { track: Track; albumArtUrl: s
                     key="view-cover"
                     id="view-cover"
                     label="View Album Cover"
-                    action={() => openImageModal(albumArtUrl)}
+                    action={() => openImageModal({ url: albumArtUrl })}
                 />
             )}
             {track.album && (

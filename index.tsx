@@ -20,9 +20,12 @@ import { definePluginSettings } from "@api/Settings";
 import { disableStyle, enableStyle } from "@api/Styles";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Flex } from "@components/Flex";
+import { FormSwitch } from "@components/FormSwitch";
+import { Heading } from "@components/Heading";
+import { Paragraph } from "@components/Paragraph";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
-import { Button, Forms, React, Switch, TextInput } from "@webpack/common";
+import { Button, React, TextInput } from "@webpack/common";
 
 import { setDebugEnabled } from "./debugLog";
 import hoverOnlyStyle from "./hoverOnly.css?managed";
@@ -69,47 +72,45 @@ function UICustomizationSettings() {
             borderRadius: 8,
             marginBottom: 16
         }}>
-            <Forms.FormSection>
-                <Forms.FormTitle tag="h3" style={{ marginBottom: 12, fontSize: 16 }}>UI Customization</Forms.FormTitle>
+            <Heading tag="h3" style={{ marginBottom: 12, fontSize: 16 }}>UI Customization</Heading>
 
-                <div style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                    gap: 16
-                }}>
-                    <Switch
-                        value={hoverControls}
-                        onChange={handleHoverControlsChange}
-                        note="Show controls only when hovering"
-                    >
-                        Hover controls
-                    </Switch>
+            <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: 16
+            }}>
+                <FormSwitch
+                    value={hoverControls}
+                    onChange={handleHoverControlsChange}
+                    title="Hover controls"
+                    description="Show controls only when hovering"
+                    hideBorder
+                />
 
-                    <Switch
-                        value={previousButtonRestartsTrack}
-                        onChange={handlePreviousButtonRestartsTrackChange}
-                        note="Restart track if >3s elapsed"
-                    >
-                        Previous restarts track
-                    </Switch>
+                <FormSwitch
+                    value={previousButtonRestartsTrack}
+                    onChange={handlePreviousButtonRestartsTrackChange}
+                    title="Previous restarts track"
+                    description="Restart track if >3s elapsed"
+                    hideBorder
+                />
 
-                    <Switch
-                        value={showSeeker}
-                        onChange={handleShowSeekerChange}
-                        note="Display seek bar in controls"
-                    >
-                        Show seeker
-                    </Switch>
+                <FormSwitch
+                    value={showSeeker}
+                    onChange={handleShowSeekerChange}
+                    title="Show seeker"
+                    description="Display seek bar in controls"
+                    hideBorder
+                />
 
-                    <Switch
-                        value={debugLogging}
-                        onChange={handleDebugLoggingChange}
-                        note="Log debug info to console"
-                    >
-                        Debug logging
-                    </Switch>
-                </div>
-            </Forms.FormSection>
+                <FormSwitch
+                    value={debugLogging}
+                    onChange={handleDebugLoggingChange}
+                    title="Debug logging"
+                    description="Log debug info to console"
+                    hideBorder
+                />
+            </div>
         </div>
     );
 }
@@ -189,61 +190,58 @@ function HttpQServerSettings() {
             borderRadius: 8,
             marginBottom: 16
         }}>
-            <Forms.FormSection>
-                <Forms.FormTitle tag="h3" style={{ marginBottom: 8, fontSize: 16 }}>HttpQ Server Configuration</Forms.FormTitle>
-                <Forms.FormText type="description" style={{ marginBottom: 8, fontSize: 13 }}>
-                    Configure connection settings for Winamp's HttpQ plugin
-                </Forms.FormText>
+            <Heading tag="h3" style={{ marginBottom: 8, fontSize: 16 }}>HttpQ Server Configuration</Heading>
+            <Paragraph style={{ marginBottom: 8, fontSize: 13 }}>
+                Configure connection settings for Winamp's HttpQ plugin
+            </Paragraph>
 
-                <Forms.FormText type="warning" style={{ marginBottom: 12, fontSize: 13 }}>
-                    ⚠️ You will need to restart Vencord for configuration changes to take effect
-                </Forms.FormText>
+            <Paragraph style={{ marginBottom: 12, fontSize: 13, color: "var(--text-warning)" }}>
+                ⚠️ You will need to restart Vencord for configuration changes to take effect
+            </Paragraph>
 
-                <Flex flexDirection="row" style={{ gap: 12, alignItems: "flex-end" }}>
-                    <div style={{ flex: 2 }}>
-                        <Forms.FormTitle tag="h5" style={{ fontSize: 14, marginBottom: 4 }}>Host</Forms.FormTitle>
-                        <TextInput
-                            value="localhost"
-                            disabled={true}
-                            placeholder="localhost"
-                            style={{ opacity: 0.6, cursor: "not-allowed" }}
-                        />
-                        <Forms.FormText type="description" style={{ marginTop: 4, fontSize: 12 }}>
-                            HttpQ communication is limited to the local machine for security reasons
-                        </Forms.FormText>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                        <Forms.FormTitle tag="h5" style={{ fontSize: 14, marginBottom: 4 }}>Port</Forms.FormTitle>
-                        <TextInput
-                            type="number"
-                            value={httpqPort}
-                            onChange={handlePortChange}
-                            placeholder="4800"
-                            error={portError ? "Invalid port number" : undefined}
-                        />
-                    </div>
-                    <div style={{ flex: 1.5 }}>
-                        <Forms.FormTitle tag="h5" style={{ fontSize: 14, marginBottom: 4 }}>Password</Forms.FormTitle>
-                        <TextInput
-                            value={httpqPassword}
-                            onChange={handlePasswordChange}
-                            placeholder="pass"
-                        />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                        <Button
-                            onClick={testConnection}
-                            submitting={buttonState === "loading"}
-                            disabled={buttonState === "loading" || portError}
-                            size={Button.Sizes.SMALL}
-                            color={getButtonColor()}
-                            style={{ width: "100%" }}
-                        >
-                            {getButtonText()}
-                        </Button>
-                    </div>
-                </Flex>
-            </Forms.FormSection>
+            <Flex flexDirection="row" style={{ gap: 12, alignItems: "flex-end" }}>
+                <div style={{ flex: 2 }}>
+                    <Heading tag="h5" style={{ fontSize: 14, marginBottom: 4 }}>Host</Heading>
+                    <TextInput
+                        value="localhost"
+                        disabled={true}
+                        placeholder="localhost"
+                        style={{ opacity: 0.6, cursor: "not-allowed" }}
+                    />
+                    <Paragraph style={{ marginTop: 4, fontSize: 12 }}>
+                        HttpQ communication is limited to the local machine for security reasons
+                    </Paragraph>
+                </div>
+                <div style={{ flex: 1 }}>
+                    <Heading tag="h5" style={{ fontSize: 14, marginBottom: 4 }}>Port</Heading>
+                    <TextInput
+                        type="number"
+                        value={httpqPort}
+                        onChange={handlePortChange}
+                        placeholder="4800"
+                        error={portError ? "Invalid port number" : undefined}
+                    />
+                </div>
+                <div style={{ flex: 1.5 }}>
+                    <Heading tag="h5" style={{ fontSize: 14, marginBottom: 4 }}>Password</Heading>
+                    <TextInput
+                        value={httpqPassword}
+                        onChange={handlePasswordChange}
+                        placeholder="pass"
+                    />
+                </div>
+                <div style={{ flex: 1 }}>
+                    <Button
+                        onClick={testConnection}
+                        disabled={buttonState === "loading" || portError}
+                        size={Button.Sizes.SMALL}
+                        color={getButtonColor()}
+                        style={{ width: "100%" }}
+                    >
+                        {getButtonText()}
+                    </Button>
+                </div>
+            </Flex>
         </div>
     );
 }
