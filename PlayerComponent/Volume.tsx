@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
-*/
+ */
 
 import { classNameFactory } from "@api/Styles";
 import { Slider } from "@webpack/common";
@@ -24,20 +24,20 @@ import { PersistentLabel } from "./components/PersistentLabel";
 
 const cl = classNameFactory("vc-winamp-");
 
-export function Volume({ volume }: { volume: number; }) {
-    return (
-        <PersistentLabel direction="above" label="Volume">
-            <div id={cl("volume-bar")}>
-                <Slider
-                    className={cl("slider")}
-                    minValue={0}
-                    maxValue={100}
-                    initialValue={volume}
-                    onValueChange={(v: number) => WinampStore.executeMediaAction("setVolume", v)}
-                    onValueRender={(v: number) => `${Math.round(v)}%`}
-                    hideBubble={false}
-                />
-            </div>
-        </PersistentLabel>
-    );
+export function Volume({ volume }: { volume: number }) {
+  return (
+    <div id={cl("volume-bar")}>
+      <Slider
+        className={cl("slider")}
+        minValue={0}
+        maxValue={100}
+        initialValue={volume}
+        onValueChange={(v: number) =>
+          WinampStore.executeMediaAction("setVolume", v)
+        }
+        onValueRender={(v: number) => `${Math.round(v)}%`}
+        hideBubble={false}
+      />
+    </div>
+  );
 }
