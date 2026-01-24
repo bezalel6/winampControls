@@ -29,7 +29,7 @@ import { Button, React, TextInput } from "@webpack/common";
 
 import { setDebugEnabled } from "./debugLog";
 import hoverOnlyStyle from "./hoverOnly.css?managed";
-import { Player } from "./PlayerComponent";
+import { Player } from "./PlayerComponent.tsx";
 import { type HTTPQConfig, WinampStore } from "./WinampStore";
 
 function toggleHoverControls(value: boolean) {
@@ -45,7 +45,7 @@ function updateHttpQConfig() {
 }
 
 function UICustomizationSettings() {
-    const { hoverControls, previousButtonRestartsTrack, showSeeker, debugLogging } = settings.use(["hoverControls", "previousButtonRestartsTrack", "showSeeker", "debugLogging"]);
+    const { hoverControls, previousButtonRestartsTrack, debugLogging } = settings.use(["hoverControls", "previousButtonRestartsTrack", "debugLogging"]);
 
     function handleHoverControlsChange(value: boolean) {
         settings.store.hoverControls = value;
@@ -54,10 +54,6 @@ function UICustomizationSettings() {
 
     function handlePreviousButtonRestartsTrackChange(value: boolean) {
         settings.store.previousButtonRestartsTrack = value;
-    }
-
-    function handleShowSeekerChange(value: boolean) {
-        settings.store.showSeeker = value;
     }
 
     function handleDebugLoggingChange(value: boolean) {
@@ -92,14 +88,6 @@ function UICustomizationSettings() {
                     onChange={handlePreviousButtonRestartsTrackChange}
                     title="Previous restarts track"
                     description="Restart track if >3s elapsed"
-                    hideBorder
-                />
-
-                <FormSwitch
-                    value={showSeeker}
-                    onChange={handleShowSeekerChange}
-                    title="Show seeker"
-                    description="Display seek bar in controls"
                     hideBorder
                 />
 
@@ -261,12 +249,6 @@ export const settings = definePluginSettings({
     previousButtonRestartsTrack: {
         type: OptionType.BOOLEAN,
         description: "Restart currently playing track when pressing the previous button if playtime is >3s",
-        default: true,
-        hidden: true
-    },
-    showSeeker: {
-        type: OptionType.BOOLEAN,
-        description: "Show seeker bar in player controls",
         default: true,
         hidden: true
     },

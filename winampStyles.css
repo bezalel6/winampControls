@@ -1,126 +1,72 @@
-@import url("./winampVariables.css");
-
+/* Main Player Container */
 #vc-winamp-player {
-    padding: var(--vc-winamp-spacing-md);
-    background: var(--vc-winamp-bg-primary);
+    padding: 12px;
+    background: var(--background-base-low);
     margin: 0;
-    border-top-left-radius: var(--vc-winamp-border-radius);
-    border-top-right-radius: var(--vc-winamp-border-radius);
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    border-bottom: 1px solid var(--border-subtle);
     display: flex;
     flex-direction: column;
+    gap: 8px;
 }
 
-.vc-winamp-button {
-    background: none;
-    color: var(--vc-winamp-interactive-normal);
-    padding: 0;
-    width: var(--vc-winamp-button-size);
-    height: var(--vc-winamp-button-size);
-    border-radius: var(--vc-winamp-border-radius-sm);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin: 0 var(--vc-winamp-spacing-xs);
-    transition: var(--vc-winamp-transition-normal) var(--vc-winamp-transition-easing);
-    transition-property: color, background-color, border-color, box-shadow;
-}
-
-.vc-winamp-button:hover {
-    color: var(--vc-winamp-interactive-hover);
-    background-color: var(--vc-winamp-bg-hover);
-}
-
-.vc-winamp-button-icon {
-    height: var(--vc-winamp-button-icon-size);
-    width: var(--vc-winamp-button-icon-size);
-}
-
-.vc-winamp-shuffle .vc-winamp-button-icon,
-.vc-winamp-repeat .vc-winamp-button-icon {
-    width: var(--vc-winamp-button-small-icon-size);
-    height: var(--vc-winamp-button-small-icon-size);
-}
-
-.vc-winamp-shuffle-on,
-.vc-winamp-repeat-playlist,
-.vc-winamp-repeat-track {
-    color: var(--vc-winamp-primary);
-    background-color: var(--vc-winamp-primary-10);
-}
-
-.vc-winamp-shuffle-on:hover,
-.vc-winamp-repeat-playlist:hover,
-.vc-winamp-repeat-track:hover {
-    color: var(--vc-winamp-primary);
-    background-color: var(--vc-winamp-primary-20);
-}
-
-.vc-winamp-tooltip-text {
-    overflow: hidden;
-    white-space: nowrap;
-    padding-right: 0.2em;
-    max-width: 100%;
-    margin: unset;
-}
-
-.vc-winamp-repeat-1 {
-    font-size: 70%;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
-
-.vc-winamp-button-row {
-    justify-content: center;
-    align-items: center;
-    padding: var(--vc-winamp-spacing-xs) 0;
-}
+/* ==================== Info Section ==================== */
 
 #vc-winamp-info-wrapper {
     display: flex;
     flex-direction: row;
     align-items: center;
     height: 3em;
-    gap: var(--vc-winamp-spacing-sm);
-    overflow: hidden;
+    gap: 0.5em;
 }
 
 #vc-winamp-album-image {
     height: 90%;
     object-fit: contain;
     border-radius: 3px;
+    flex-shrink: 0;
     transition: filter 0.2s;
 }
 
-#vc-winamp-album-image:hover {
+#vc-winamp-album-image.vc-winamp-album-image-clickable {
+    cursor: pointer;
+}
+
+#vc-winamp-album-image.vc-winamp-album-image-clickable:hover {
     filter: brightness(1.2);
     cursor: pointer;
 }
 
 #vc-winamp-album-expanded-wrapper {
-    width: 100%;
+    display: flex;
+    justify-content: center;
 }
 
 #vc-winamp-album-expanded-wrapper #vc-winamp-album-image {
     width: 100%;
     height: auto;
+    max-height: 200px;
     object-fit: contain;
 }
 
 #vc-winamp-titles {
     display: flex;
     flex-direction: column;
-    padding: var(--vc-winamp-spacing-xs);
+    padding: 0.2rem;
     align-items: flex-start;
     place-content: flex-start center;
     overflow: hidden;
 }
 
 #vc-winamp-song-title {
-    color: var(--vc-winamp-text-primary);
-    font-size: var(--vc-winamp-font-size-md);
-    font-weight: var(--vc-winamp-font-weight-semibold);
+    color: var(--text-strong);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.vc-winamp-secondary-song-info {
+    font-size: 12px;
 }
 
 .vc-winamp-ellipoverflow {
@@ -132,200 +78,218 @@
 
 .vc-winamp-artist,
 .vc-winamp-album {
-    font-size: var(--vc-winamp-font-size-sm);
+    font-size: 12px;
     text-decoration: none;
-    color: var(--vc-winamp-text-primary);
-}
-
-.vc-winamp-comma {
-    color: var(--vc-winamp-text-secondary);
-}
-
-.vc-winamp-artist[role="link"]:hover,
-#vc-winamp-album-title[role="link"]:hover,
-#vc-winamp-song-title[role="link"]:hover {
-    text-decoration: underline;
-    cursor: pointer;
+    color: var(--text-strong);
 }
 
 .vc-winamp-song-info-prefix {
     display: none;
 }
 
-.vc-winamp-secondary-song-info {
-    font-size: var(--vc-winamp-font-size-sm);
+/* ==================== Playback Section ==================== */
+
+.vc-winamp-playback-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
-/* Base slider styling - used by both progress bar and volume slider */
-.vc-winamp-slider {
+/* ==================== Volume Bar ==================== */
+
+.vc-winamp-volume-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 50%;
+    margin: 0 auto;
+    padding: 2px 0;
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+}
+
+.vc-winamp-volume-bar:hover {
+    opacity: 1;
+}
+
+.vc-winamp-volume-bar svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    color: var(--interactive-icon-default);
+}
+
+.vc-winamp-volume-bar > [class*="slider"] {
+    flex-grow: 1;
+    padding: 0 !important;
+}
+
+.vc-winamp-volume-bar > [class*="slider"] [class*="bar"] {
+    height: 2px !important;
+}
+
+.vc-winamp-volume-bar > [class*="slider"] [class*="barFill"] {
+    background-color: var(--interactive-icon-active);
+}
+
+.vc-winamp-volume-bar > [class*="slider"] [class*="grabber"] {
+    height: 10px !important;
+    width: 10px !important;
+    background-color: var(--interactive-icon-active);
+    border-color: var(--interactive-icon-default);
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+
+.vc-winamp-volume-bar:hover > [class*="slider"] [class*="grabber"] {
+    opacity: 1;
+}
+
+/* ==================== Progress/Seek Bar ==================== */
+
+#vc-winamp-progress-bar {
+    position: relative;
+    color: var(--text-default);
+    width: 100%;
+    margin: 0.5em 0;
+    margin-bottom: 5px;
+}
+
+#vc-winamp-progress-bar > [class*="slider"] {
     flex-grow: 1;
     width: 100%;
     padding: 0 !important;
-    margin: 0 var(--vc-winamp-spacing-sm);
-    max-height: 500px;
-    overflow: hidden;
 }
 
-.vc-winamp-slider [class^="bar"] {
-    height: var(--vc-winamp-slider-height) !important;
-    background: var(--vc-winamp-border-primary);
-    border-radius: var(--vc-winamp-border-radius-sm);
+#vc-winamp-progress-bar > [class*="slider"] [class*="bar"] {
+    height: 3px !important;
     top: calc(12px - 4px / 2 + var(--bar-offset));
 }
 
-.vc-winamp-slider [class^="barFill"] {
-    background-color: var(--vc-winamp-interactive-active) !important;
-    border-radius: var(--vc-winamp-border-radius-sm);
+#vc-winamp-progress-bar > [class*="slider"] [class*="barFill"] {
+    background-color: var(--interactive-icon-active);
 }
 
-.vc-winamp-slider:hover [class^="barFill"] {
-    background-color: var(--vc-winamp-primary) !important;
-}
-
-.vc-winamp-slider [class^="grabber"] {
-    background-color: var(--vc-winamp-interactive-active) !important;
-    border-color: var(--vc-winamp-interactive-active) !important;
-    color: var(--vc-winamp-interactive-active);
-    width: var(--vc-winamp-slider-thumb-size) !important;
-    height: var(--vc-winamp-slider-thumb-size) !important;
-    border-radius: 50% !important;
-    position: absolute !important;
-    top: 50% !important;
-    margin-top: calc(17px / -2 + var(--bar-offset) / 2) !important;
+#vc-winamp-progress-bar > [class*="slider"] [class*="grabber"] {
+    height: 16px !important;
+    width: 16px !important;
+    margin-top: calc(17px/-2 + var(--bar-offset)/2);
     margin-left: -0.5px;
+    background-color: var(--interactive-icon-active);
+    border-color: var(--interactive-icon-default);
+    color: var(--interactive-icon-default);
     opacity: 0;
-    transform: scale(0);
-    transition: var(--vc-winamp-transition-normal) var(--vc-winamp-transition-easing);
-    transition-property: opacity, transform;
+    transition: opacity 0.1s;
 }
 
-.vc-winamp-slider [class^="grabber"]:hover {
-    background-color: var(--vc-winamp-interactive-hover) !important;
-    border-color: var(--vc-winamp-interactive-hover) !important;
-}
-
-/* Progress bar specific styling */
-#vc-winamp-progress-bar {
-    position: relative;
-    color: var(--vc-winamp-text-primary);
-    width: 100%;
-    margin-bottom: 0;
-    order: 3; /* Place at bottom */
-}
-
-#vc-winamp-progress-bar:hover .vc-winamp-slider [class^="grabber"] {
-    opacity: 0;
-    transform: scale(1);
-}
-
-#vc-winamp-progress-text {
-    display: flex;
-    margin: auto auto;
-    margin-top: var(--vc-winamp-spacing-sm);
-    align-items: center;
-    justify-content: space-between;
-    transition: 0.2s width;
+#vc-winamp-progress-bar:hover > [class*="slider"] [class*="grabber"] {
+    opacity: 1;
 }
 
 .vc-winamp-progress-time {
-    font-size: var(--vc-winamp-font-size-sm);
-    font-family: var(--vc-winamp-font-family-code);
-    position: relative;
-    display: inline-block;
-}
-#vc-winamp-progress-bar.vc-winamp-progress-divider {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 12px;
-    overflow: hidden;
-}
-/* Volume control styling - matches progress bar structure */
-#vc-winamp-volume-bar {
-    position: relative;
-    color: var(--vc-winamp-text-primary);
-    width: 100%;
-    margin-bottom: 0;
+    font-size: 12px;
+    top: 10px;
+    position: absolute;
+    margin-top: 8px;
+    font-family: var(--font-code);
 }
 
-#vc-winamp-volume-bar .vc-winamp-slider [class^="grabber"] {
-    opacity: 1;
-    transform: scale(1);
+.vc-winamp-time-left {
+    left: 0;
+}
+
+.vc-winamp-time-right {
+    right: 0;
+}
+
+/* ==================== Control Buttons ==================== */
+
+.vc-winamp-button-row {
+    justify-content: center;
+    margin-top: 14px;
+}
+
+.vc-winamp-button {
+    margin: 0 2px;
+    border-radius: var(--radius-sm);
+    background: none;
+    border: none;
+    color: var(--interactive-icon-default);
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+
+.vc-winamp-button:hover {
+    color: var(--interactive-icon-hover);
+    background-color: var(--background-mod-strong);
+}
+
+.vc-winamp-button-icon {
+    height: 20px;
+    width: 20px;
+}
+
+/* Play/Pause button - slightly larger */
+.vc-winamp-play-pause {
+    width: 36px;
+    height: 36px;
+}
+
+.vc-winamp-play-pause .vc-winamp-button-icon {
+    height: 22px;
+    width: 22px;
+}
+
+.vc-winamp-play-pause.vc-winamp-button-active {
+    color: var(--interactive-icon-active);
+}
+
+/* Shuffle and Repeat buttons */
+.vc-winamp-shuffle .vc-winamp-button-icon,
+.vc-winamp-repeat .vc-winamp-button-icon {
+    width: 18px;
+    height: 18px;
+}
+
+/* Active states for shuffle/repeat */
+.vc-winamp-repeat-playlist,
+.vc-winamp-repeat-track,
+.vc-winamp-shuffle-on {
+    color: var(--interactive-icon-active);
+    background-color: var(--background-mod-strong);
+}
+
+/* Repeat "1" indicator */
+.vc-winamp-repeat {
+    position: relative;
+}
+
+.vc-winamp-repeat-1 {
+    font-size: 9px;
+    font-weight: 700;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+/* ==================== Utilities ==================== */
+
+.vc-winamp-tooltip-text {
+    overflow: hidden;
+    white-space: nowrap;
+    padding-right: 0.2em;
+    max-width: 100%;
+    margin: unset;
 }
 
 .vc-winamp-fallback {
-    padding: var(--vc-winamp-spacing-sm);
-    color: var(--vc-winamp-text-primary);
-}
-
-/* Tooltips for buttons */
-.vc-winamp-tooltip-container {
-    position: relative;
-    display: inline-block;
-}
-
-.vc-winamp-tooltip {
-    position: absolute;
-    bottom: 110%;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: var(--vc-winamp-bg-tertiary);
-    color: var(--vc-winamp-text-primary);
-    padding: 4px 8px;
-    border-radius: var(--vc-winamp-border-radius-sm);
-    font-size: 11px;
-    font-weight: 500;
-    white-space: nowrap;
-    pointer-events: none;
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-    border: 1px solid var(--vc-winamp-border-secondary);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.vc-winamp-tooltip-arrow {
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 0;
-    height: 0;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 5px solid var(--vc-winamp-bg-tertiary);
-}
-
-.vc-winamp-tooltip-container:hover .vc-winamp-tooltip {
-    opacity: 1;
-}
-
-/* Persistent labels */
-.vc-winamp-persistent-label-container {
-    position: relative;
-}
-.vc-winamp-persistent-label.vc-winamp-above {
-    top: -10px;
-}
-.vc-winamp-persistent-label.vc-winamp-below {
-    bottom: -20px;
-}
-.vc-winamp-persistent-label {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--vc-winamp-text-tertiary);
-    background: var(--vc-winamp-bg-primary);
-    padding: 1px 6px;
-    border-radius: 2px;
-    border: 1px solid var(--vc-winamp-border-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    opacity: 1;
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.1),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-    z-index: 100;
+    padding: 0.5em;
+    color: var(--text-default);
 }
