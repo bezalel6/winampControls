@@ -88,6 +88,9 @@ export const WinampStore = proxyLazyWebpack(() => {
 
         private client: WinampClient;
         private pollingInterval: number | null = null;
+        private reconnectionInterval: number | null = null;
+        private readonly POLLING_INTERVAL_MS = 1000; // Fast polling when connected
+        private readonly RECONNECTION_INTERVAL_MS = 60000; // Slow check when disconnected (1 minute)
 
         // The optimistic media controller - handles all optimistic updates
         private optimisticController: OptimisticMediaController;
@@ -146,6 +149,10 @@ export const WinampStore = proxyLazyWebpack(() => {
             try {
                 return await this.client.getPlayerState();
             } catch (error) {
+                // Re-throw ConsecutiveFailuresError so polling can handle it properly
+                if (error instanceof ConsecutiveFailuresError) {
+                    throw error;
+                }
                 debugError("WinampStore", "Failed to get current state:", error);
                 return null;
             }
@@ -198,9 +205,7 @@ export const WinampStore = proxyLazyWebpack(() => {
 
         // Start polling for player state updates
         public startStatePolling() {
-            if (this.pollingInterval) {
-                clearInterval(this.pollingInterval);
-            }
+            this.stopAllPolling();
 
             debugLog("WinampStore", "Starting state polling");
             this.isPollingEnabled = true;
@@ -268,11 +273,11 @@ export const WinampStore = proxyLazyWebpack(() => {
                     }
                 } catch (error) {
                     if (error instanceof ConsecutiveFailuresError) {
-                        debugError("WinampStore", `Stopping polling due to consecutive failures: ${error.message}`);
+                        debugLog("WinampStore", `Connection lost, switching to slow reconnection mode (checking every ${this.RECONNECTION_INTERVAL_MS / 1000}s)`);
                         this.lastConsecutiveFailure = error;
                         this.isPollingEnabled = false;
 
-                        // Apply disconnected state with timestamp-based conflict resolution
+                        // Apply disconnected state
                         const disconnectedState = {
                             track: null,
                             volume: 0,
@@ -283,26 +288,67 @@ export const WinampStore = proxyLazyWebpack(() => {
                         };
 
                         const disconnectedPollTime = Date.now();
-                        const filteredDisconnectedUpdate = this.optimisticController.getFilteredPollingUpdate(disconnectedState, disconnectedPollTime);
-
                         this.applyPollingUpdate(disconnectedState, disconnectedPollTime);
 
-                        // Dispatch ONLY the filtered disconnected state to Flux
+                        // Dispatch disconnected state to Flux
                         (FluxDispatcher as any).dispatch({
                             type: "WINAMP_PLAYER_STATE",
-                            track: filteredDisconnectedUpdate.track ?? this.track,
-                            volume: filteredDisconnectedUpdate.volume ?? this.volume,
-                            isPlaying: filteredDisconnectedUpdate.isPlaying ?? this.isPlaying,
-                            repeat: filteredDisconnectedUpdate.repeat ?? this.repeat,
-                            shuffle: filteredDisconnectedUpdate.shuffle ?? this.shuffle,
-                            position: filteredDisconnectedUpdate.position ?? this.position,
+                            track: null,
+                            volume: 0,
+                            isPlaying: false,
+                            repeat: "off",
+                            shuffle: false,
+                            position: 0,
                             isConnected: false
                         });
+
+                        // Stop fast polling and start slow reconnection checking
+                        this.stopStatePolling();
+                        this.startReconnectionPolling();
                     } else {
                         debugError("WinampStore", "Polling error:", error);
                     }
                 }
-            }, 1000) as unknown as number; // Poll every second
+            }, this.POLLING_INTERVAL_MS) as unknown as number;
+        }
+
+        // Start slow reconnection polling (checks once per minute when disconnected)
+        private startReconnectionPolling() {
+            if (this.reconnectionInterval) {
+                clearInterval(this.reconnectionInterval);
+            }
+
+            debugLog("WinampStore", "Starting reconnection polling");
+
+            this.reconnectionInterval = window.setInterval(async () => {
+                const reconnected = await this.attemptReconnection();
+                if (reconnected) {
+                    debugLog("WinampStore", "Reconnected to Winamp, resuming normal polling");
+                    this.stopReconnectionPolling();
+                    this.startStatePolling();
+                }
+            }, this.RECONNECTION_INTERVAL_MS) as unknown as number;
+        }
+
+        // Stop reconnection polling
+        private stopReconnectionPolling() {
+            if (this.reconnectionInterval) {
+                clearInterval(this.reconnectionInterval);
+                this.reconnectionInterval = null;
+                debugLog("WinampStore", "Stopped reconnection polling");
+            }
+        }
+
+        // Stop all polling intervals
+        private stopAllPolling() {
+            if (this.pollingInterval) {
+                clearInterval(this.pollingInterval);
+                this.pollingInterval = null;
+            }
+            if (this.reconnectionInterval) {
+                clearInterval(this.reconnectionInterval);
+                this.reconnectionInterval = null;
+            }
         }
 
         // Stop polling for player state updates
@@ -312,31 +358,34 @@ export const WinampStore = proxyLazyWebpack(() => {
                 this.pollingInterval = null;
                 debugLog("WinampStore", "Stopped state polling");
             }
+        }
+
+        // Stop all polling (both state and reconnection)
+        public stopAllStatePolling() {
+            this.stopStatePolling();
+            this.stopReconnectionPolling();
             this.isPollingEnabled = false;
         }
 
         // Attempt to reconnect after consecutive failures
         public async attemptReconnection(): Promise<boolean> {
             try {
-                debugLog("WinampStore", "Attempting to reconnect...");
+                // Reset the failure count silently before attempting
+                this.client.resetFailureCount(true);
 
-                // Reset the failure count on the client
-                this.client.resetFailureCount();
-
-                // Test the connection
+                // Test the connection - this is quiet, no logging unless successful
                 const isConnected = await this.client.isConnected();
 
                 if (isConnected) {
-                    debugLog("WinampStore", "Reconnection successful, resuming polling");
+                    debugLog("WinampStore", "Reconnected to Winamp successfully");
                     this.isPollingEnabled = true;
                     this.lastConsecutiveFailure = null;
                     return true;
-                } else {
-                    debugLog("WinampStore", "Reconnection failed");
-                    return false;
                 }
-            } catch (error) {
-                debugError("WinampStore", "Reconnection attempt failed:", error);
+                // Silent failure - we don't want to spam logs every minute
+                return false;
+            } catch {
+                // Silent failure during reconnection attempts
                 return false;
             }
         }

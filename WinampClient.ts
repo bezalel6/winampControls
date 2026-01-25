@@ -143,7 +143,13 @@ export class WinampClient {
     private handleCallFailure(endpoint: EndpointName, error: any) {
         this.isConnectedState = false;
         this.consecutiveFailures++;
-        debugError("WinampClient", `${endpoint} failed (${this.consecutiveFailures}/${this.maxConsecutiveFailures}):`, error);
+
+        // Only log the first few failures to avoid flooding the console
+        // After that, just throw silently when threshold is reached
+        if (this.consecutiveFailures <= this.maxConsecutiveFailures) {
+            debugError("WinampClient", `${endpoint} failed (${this.consecutiveFailures}/${this.maxConsecutiveFailures}):`, error);
+        }
+
         if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
             throw new ConsecutiveFailuresError(this.consecutiveFailures);
         }
@@ -415,9 +421,11 @@ export class WinampClient {
     public getConnectionState(): boolean {
         return this.isConnectedState;
     }
-    public resetFailureCount() {
+    public resetFailureCount(silent = false) {
         this.consecutiveFailures = 0;
-        debugLog("WinampClient", "Consecutive failure count reset");
+        if (!silent) {
+            debugLog("WinampClient", "Consecutive failure count reset");
+        }
     }
     public getConsecutiveFailures(): number {
         return this.consecutiveFailures;
