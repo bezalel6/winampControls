@@ -15,7 +15,33 @@
     overflow: hidden;
     pointer-events: none;
     transition: 0.2s;
-    transition-property: height, padding;
+    transition-property: height, padding, margin;
+}
+
+/* Zero height is not enough on its own: the surrounding margin and flex gaps
+   are reserved whether or not the items they separate have any size. Without
+   this the collapsed player keeps ~26px of empty space under the track info
+   and the padding no longer looks even. Each rule outranks its winampStyles.css
+   counterpart, so hovering restores the original value by simply not applying. */
+
+#vc-winamp-player:not(:hover) .vc-winamp-button-row {
+    margin-top: 0;
+}
+
+#vc-winamp-player:not(:hover) .vc-winamp-playback-section {
+    gap: 0;
+}
+
+/* When the seek bar is turned off the playback section has nothing visible in
+   it at all, so the gap separating it from the track info goes too. With the
+   seek bar on that gap is still doing real work and stays put. */
+#vc-winamp-player:not(:hover):not(:has(#vc-winamp-progress-bar)) {
+    gap: 0;
+}
+
+#vc-winamp-player,
+#vc-winamp-player .vc-winamp-playback-section {
+    transition: gap 0.2s;
 }
 
 #vc-winamp-player:hover .vc-winamp-button-row,
@@ -24,7 +50,7 @@
     pointer-events: auto;
 
     /* only transition opacity on show to prevent clipping */
-    transition-property: height, padding, opacity;
+    transition-property: height, padding, margin, opacity;
 }
 
 #vc-winamp-player:hover .vc-winamp-button-row {
