@@ -404,13 +404,13 @@ export default definePlugin({
   },
   patches: [
     {
-      find: "#{intl::USER_PROFILE_ACCOUNT_POPOUT_BUTTON_A11Y_LABEL}",
-            replacement: {
-                // react.jsx)(AccountPanel, { ..., showTaglessAccountPanel: blah })
-                match: /(?<=\i\.jsxs?\)\()(\i),{(?=[^}]*?userTag:\i,occluded:)/,
-                // react.jsx(WrapperComponent, { VencordOriginal: AccountPanel, ...
-                replace: "$self.PanelWrapper,{VencordOriginal:$1,"
-            }
+      find: ".DISPLAY_NAME_STYLES_COACHMARK)",
+      replacement: {
+        // react.jsx)(AccountPanel, { ..., showTaglessAccountPanel: blah })
+        match: /(?<=\i\.jsxs?\)\()(\i),{(?=[^}]*?userTag:\i,occluded:)/,
+        // react.jsx(WrapperComponent, { VencordOriginal: AccountPanel, ...
+        replace: "$self.PanelWrapper,{VencordOriginal:$1,",
+      },
     },
   ],
 
