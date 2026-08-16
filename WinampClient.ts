@@ -5,9 +5,21 @@
  */
 
 import { debugError, debugLog } from "./debugLog";
+import { HTTPQ_VOLUME_MAX } from "./types/endpoints";
 import type { EndpointName, EndpointParams, EndpointResponse, RepeatMode, VolumeLevel } from "./types/endpoints";
 
 export type { RepeatMode };
+
+// httpQ joins list responses with a caller-supplied delimiter and does no
+// escaping, so the delimiter must be something a track title cannot contain.
+// ";" was in use and silently corrupted any playlist with a semicolon in it.
+const LIST_DELIM = "\n";
+const FIELD_DELIM = "\x1f"; // ASCII unit separator
+
+// httpQ volume is 0-255; everything above this class works in percent.
+const toPercent = (raw: number) => Math.round((raw / HTTPQ_VOLUME_MAX) * 100);
+const fromPercent = (pct: number) =>
+    Math.round((Math.max(0, Math.min(100, pct)) / 100) * HTTPQ_VOLUME_MAX);
 
 // HTTPQConfig interface for connection configuration
 export interface HTTPQConfig {
@@ -156,9 +168,11 @@ export class WinampClient {
     }
 
     private isPollingCall(endpoint: EndpointName): boolean {
+        // These run on every 1s poll; logging them would flood the console.
         const pollingEndpoints: EndpointName[] = [
             "isPlaying", "getOutputTime", "getVolume", "getListPos", "getListLength",
-            "repeatStatus", "shuffleStatus", "getCurrentTitle", "getPlaylistFile", "hasId3Tag"
+            "repeatStatus", "shuffleStatus", "getCurrentTitle", "getPlaylistFile",
+            "hasId3Tag", "getId3Tag", "hasId3v2Tag", "getId3v2Tag"
         ];
         return pollingEndpoints.includes(endpoint);
     }
@@ -188,7 +202,7 @@ export class WinampClient {
             const statusNum = Number(status.data);
             const positionMs = position;
             const lengthMs = length;
-            const volumeNum = Number(volume.data);
+            const volumeNum = toPercent(Number(volume.data));
             const playlistPosNum = Number(playlistPos.data);
             const playlistLenNum = Number(playlistLen.data);
             const repeatNum = Number(repeat.data);
@@ -270,6 +284,10 @@ export class WinampClient {
 
     private parseTrackTitle(title: string): { title?: string; artist?: string; } {
         if (!title) return {};
+        // getcurrenttitle comes from the player's window caption, which is
+        // prefixed with the playlist position ("4. Artist - Track"). Without
+        // stripping it the artist ends up as "4. Artist".
+        title = title.replace(/^\s*\d+\.\s+/, "");
         const parts = title.split(" - ");
         if (parts.length >= 2) {
             return {
@@ -280,46 +298,73 @@ export class WinampClient {
         return { title: title.trim() };
     }
 
+    // Tries ID3v2 before ID3v1: the original only ever asked for v1, so every
+    // modern MP3 (v2-only) reported no metadata at all. Files with neither —
+    // FLAC, Ogg and friends, which carry Vorbis comments httpQ cannot read —
+    // still fall back to parsing the player's formatted title.
     async getTrackMetadata(index?: number): Promise<TrackMetadata> {
-        try {
-            const hasTagResult = await this.call("hasId3Tag", { index });
-            if (!Number(hasTagResult.data)) return {};
-            const tagsResult = await this.call("getId3Tag", {
-                tags: "t,a,l,y,g,r",
-                delim: ";",
-                index
-            });
-            if (!tagsResult.data) return {};
-            const [title, artist, album, year, genre, track] = String(tagsResult.data).split(";");
-            return {
-                title: title || undefined,
-                artist: artist || undefined,
-                album: album || undefined,
-                year: year || undefined,
-                genre: genre || undefined,
-                track: track || undefined
-            };
-        } catch (error) {
-            return {};
+        const attempts = [
+            { has: "hasId3v2Tag", get: "getId3v2Tag" },
+            { has: "hasId3Tag", get: "getId3Tag" },
+        ] as const;
+
+        for (const { has, get } of attempts) {
+            try {
+                const hasTagResult = await this.call(has, { index });
+                if (!Number(hasTagResult.data)) continue;
+
+                const tagsResult = await this.call(get, {
+                    tags: "t,a,l,y,g,r",
+                    delim: FIELD_DELIM,
+                    index
+                });
+                if (!tagsResult.data) continue;
+
+                const [title, artist, album, year, genre, track] =
+                    String(tagsResult.data).split(FIELD_DELIM);
+                const metadata: TrackMetadata = {
+                    title: title || undefined,
+                    artist: artist || undefined,
+                    album: album || undefined,
+                    year: year || undefined,
+                    genre: genre || undefined,
+                    track: track || undefined
+                };
+                // A tag can exist but be entirely blank; fall through if so.
+                if (Object.values(metadata).some(Boolean)) return metadata;
+            } catch {
+                // Try the next tag version.
+            }
         }
+        return {};
     }
 
+    // Two bulk requests rather than one per track: this used to issue N+2
+    // sequential round-trips, so a 200-track playlist meant 202 of them.
     async getPlaylist(): Promise<Track[]> {
         try {
-            const lengthResult = await this.call("getListLength", {});
-            const titlesResult = await this.call("getPlaylistTitleList", { delim: ";" });
+            const [titlesResult, filesResult] = await Promise.all([
+                this.call("getPlaylistTitleList", { delim: LIST_DELIM }),
+                this.call("getPlaylistFileList", { delim: LIST_DELIM }),
+            ]);
             if (!titlesResult.data) return [];
-            const length = Number(lengthResult.data);
-            const titleArray = String(titlesResult.data).split(";");
-            const playlist: Track[] = [];
-            for (let i = 0; i < Math.min(length, titleArray.length); i++) {
-                const fileResult = await this.call("getPlaylistFile", { index: i });
-                const track = await this.buildTrackInfo(titleArray[i], String(fileResult.data), i, 0);
-                if (track) {
-                    playlist.push(track);
-                }
-            }
-            return playlist;
+
+            const titles = String(titlesResult.data).split(LIST_DELIM);
+            const files = String(filesResult.data ?? "").split(LIST_DELIM);
+
+            // Titles come from the player and always exist; files may not if
+            // the playlist changed between the two calls.
+            return titles.map((title, i) => {
+                const parsed = this.parseTrackTitle(title);
+                return {
+                    id: `${i}-${files[i] ?? ""}`,
+                    name: parsed.title || title || "Unknown Track",
+                    duration: 0,
+                    artist: parsed.artist || "Unknown Artist",
+                    filePath: files[i] ?? "",
+                    playlistIndex: i,
+                };
+            });
         } catch (error) {
             throw new Error(`Failed to get playlist: ${error instanceof Error ? error.message : "Unknown error"}`);
         }
@@ -346,9 +391,9 @@ export class WinampClient {
         const result = await this.call("prev", {});
         return String(result.data).trim() === "1";
     }
+    // level is a percentage; httpQ wants 0-255.
     async setVolume(level: number): Promise<boolean> {
-        const clampedLevel = Math.max(0, Math.min(100, level));
-        const result = await this.call("setVolume", { level: clampedLevel });
+        const result = await this.call("setVolume", { level: fromPercent(level) });
         return String(result.data).trim() === "1";
     }
     async setRepeat(mode: RepeatMode): Promise<boolean> {

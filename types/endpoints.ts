@@ -7,7 +7,10 @@
 // Core response types
 export type PlaybackStatus = 0 | 1 | 3; // 0 = stopped, 1 = playing, 3 = paused
 export type BooleanResponse = 0 | 1;
-export type VolumeLevel = number; // 0-100
+// httpQ's native volume range. The UI works in percent; WinampClient converts
+// at the boundary so nothing above it has to know about 255.
+export type VolumeLevel = number; // 0-255 on the wire
+export const HTTPQ_VOLUME_MAX = 255;
 export type EQBand = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 export type TimeFormat = 0 | 1; // 0 = milliseconds, 1 = seconds
 export type RepeatMode = "off" | "track" | "playlist";
@@ -45,6 +48,7 @@ export interface WinampEndpoints {
     getPlaylistFile: { params: { index?: number; }, response: string; };
     getPlaylistTitle: { params: { index?: number; }, response: string; };
     getPlaylistTitleList: { params: { delim: string; }, response: string; };
+    getPlaylistFileList: { params: { delim: string; }, response: string; };
 
     // Modes
     repeat: { params: { enable: BooleanResponse; }, response: BooleanResponse; };
@@ -55,6 +59,8 @@ export interface WinampEndpoints {
     // Metadata
     getId3Tag: { params: { tags: string, delim: string, index?: number; }, response: string; };
     hasId3Tag: { params: { index?: number; }, response: BooleanResponse; };
+    getId3v2Tag: { params: { tags: string, delim: string, index?: number; }, response: string; };
+    hasId3v2Tag: { params: { index?: number; }, response: BooleanResponse; };
 
     // EQ
     getEqData: { params: { band: EQBand; }, response: number; };

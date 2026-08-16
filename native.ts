@@ -8,7 +8,19 @@ import { IpcMainInvokeEvent } from "electron";
 
 import type { EndpointName, EndpointParams, EndpointResponse } from "./types/endpoints";
 
-// Generic call function with localhost validation and endpoint lowercasing
+// Most httpQ commands are just the lowercased endpoint name, but a few carry
+// an underscore. Lowercasing alone produced "repeatstatus", which httpQ does
+// not recognise, so those calls silently returned "0" forever.
+const HTTPQ_COMMAND: Partial<Record<EndpointName, string>> = {
+    repeatStatus: "repeat_status",
+    shuffleStatus: "shuffle_status",
+};
+
+// Loopback only, but all the spellings of it: "localhost" resolves to ::1
+// first on Windows, and users reasonably type 127.0.0.1.
+const ALLOWED_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+
+// Generic call function with loopback validation and endpoint name mapping
 async function call<T extends EndpointName>(
     _: IpcMainInvokeEvent,
     base: string,
@@ -16,21 +28,20 @@ async function call<T extends EndpointName>(
     params: EndpointParams<T>
 ): Promise<{ status: number; data: EndpointResponse<T>; }> {
 
+    const command = HTTPQ_COMMAND[endpoint] ?? endpoint.toLowerCase();
 
-    const lowercaseEndpoint = endpoint.toLowerCase();
-    const url = `http://${base}/${lowercaseEndpoint}`;
-    const urlParams = new URLSearchParams();
+    // Built by hand rather than with URLSearchParams: that serialises a space
+    // as "+", and httpQ's decoder only understands %XX, so it would receive a
+    // literal plus. A password containing a space failed to authenticate.
+    const query = Object.entries(params)
+        .filter(([, value]) => value !== undefined && value !== null)
+        .map(([key, value]) => `${key}=${encodeURIComponent(String(value))}`)
+        .join("&");
 
-    for (const [key, value] of Object.entries(params)) {
-        if (value !== undefined && value !== null) {
-            urlParams.append(key, String(value));
-        }
-    }
+    const fullUrl = new URL(`http://${base}/${command}?${query}`);
 
-    const fullUrl = new URL(`${url}?${urlParams.toString()}`);
-
-    if (fullUrl.hostname !== "localhost") {
-        throw new Error("Invalid URL");
+    if (!ALLOWED_HOSTS.has(fullUrl.hostname)) {
+        throw new Error(`Refusing non-loopback host: ${fullUrl.hostname}`);
     }
     try {
         const response = await fetch(fullUrl);
@@ -92,12 +103,15 @@ export const setPlaylistPos = makeEndpoint("setPlaylistPos", ["index"]);
 export const getPlaylistFile = makeEndpoint("getPlaylistFile", ["index"]);
 export const getPlaylistTitle = makeEndpoint("getPlaylistTitle", ["index"]);
 export const getPlaylistTitleList = makeEndpoint("getPlaylistTitleList", ["delim"]);
+export const getPlaylistFileList = makeEndpoint("getPlaylistFileList", ["delim"]);
 export const repeat = makeEndpoint("repeat", ["enable"]);
 export const repeatStatus = makeEndpoint("repeatStatus", []);
 export const shuffle = makeEndpoint("shuffle", ["enable"]);
 export const shuffleStatus = makeEndpoint("shuffleStatus", []);
 export const getId3Tag = makeEndpoint("getId3Tag", ["tags", "delim", "index"]);
 export const hasId3Tag = makeEndpoint("hasId3Tag", ["index"]);
+export const getId3v2Tag = makeEndpoint("getId3v2Tag", ["tags", "delim", "index"]);
+export const hasId3v2Tag = makeEndpoint("hasId3v2Tag", ["index"]);
 export const getEqData = makeEndpoint("getEqData", ["band"]);
 export const setEqData = makeEndpoint("setEqData", ["band", "level"]);
 
