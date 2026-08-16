@@ -1,16 +1,37 @@
-.vc-winamp-button-row {
+/* Collapse the interactive controls until the player is hovered.
+   Applies to the button row and the volume bar, which sit next to each other
+   inside #vc-winamp-player.
+
+   Everything is scoped under #vc-winamp-player so these rules outrank the
+   plain-class rules in winampStyles.css (notably the volume bar's own
+   opacity and padding) no matter which stylesheet the client injects first. */
+
+#vc-winamp-player .vc-winamp-button-row,
+#vc-winamp-player .vc-winamp-volume-bar {
+    box-sizing: border-box;
     height: 0;
+    padding: 0;
     opacity: 0;
+    overflow: hidden;
     pointer-events: none;
     transition: 0.2s;
-    transition-property: height;
+    transition-property: height, padding;
 }
 
-#vc-winamp-player:hover .vc-winamp-button-row {
+#vc-winamp-player:hover .vc-winamp-button-row,
+#vc-winamp-player:hover .vc-winamp-volume-bar {
     opacity: 1;
-    height: 32px;
     pointer-events: auto;
 
     /* only transition opacity on show to prevent clipping */
-    transition-property: height, opacity;
+    transition-property: height, padding, opacity;
+}
+
+#vc-winamp-player:hover .vc-winamp-button-row {
+    height: 32px;
+}
+
+#vc-winamp-player:hover .vc-winamp-volume-bar {
+    height: 18px; /* 14px icon + 2px padding top and bottom */
+    padding: 2px 0;
 }
